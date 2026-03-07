@@ -1,0 +1,112 @@
+import { cva, type VariantProps } from "class-variance-authority"
+import { Slot } from "radix-ui"
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+const badgeVariants = cva(
+  "inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+        secondary:
+          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+        destructive:
+          "bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        success:
+          "bg-success text-success-foreground [a&]:hover:bg-success/90",
+        warning:
+          "bg-warning text-warning-foreground [a&]:hover:bg-warning/90",
+        info:
+          "bg-info text-info-foreground [a&]:hover:bg-info/90",
+        outline:
+          "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 [a&]:hover:underline",
+      },
+      mode: {
+        solid: "",
+        subtle: "border",
+        outline: "bg-background border",
+      },
+      size: {
+        sm: "px-1.5 py-0 text-[10px] [&>svg]:size-2.5 gap-0.5",
+        default: "px-2 py-0.5 text-xs [&>svg]:size-3 gap-1",
+        lg: "px-2.5 py-1 text-sm [&>svg]:size-3.5 gap-1.5",
+      },
+    },
+    compoundVariants: [
+      {
+        variant: "destructive",
+        mode: "subtle",
+        className: "bg-destructive-subtle text-destructive-subtle-foreground border-destructive/20 [a&]:hover:bg-destructive-subtle/80",
+      },
+      {
+        variant: "destructive",
+        mode: "outline",
+        className: "border-destructive text-destructive [a&]:hover:bg-destructive/10",
+      },
+      {
+        variant: "success",
+        mode: "subtle",
+        className: "bg-success-subtle text-success-subtle-foreground border-success/20 [a&]:hover:bg-success-subtle/80",
+      },
+      {
+        variant: "success",
+        mode: "outline",
+        className: "border-success text-success [a&]:hover:bg-success/10",
+      },
+      {
+        variant: "warning",
+        mode: "subtle",
+        className: "bg-warning-subtle text-warning-subtle-foreground border-warning/20 [a&]:hover:bg-warning-subtle/80",
+      },
+      {
+        variant: "warning",
+        mode: "outline",
+        className: "border-warning text-warning [a&]:hover:bg-warning/10",
+      },
+      {
+        variant: "info",
+        mode: "subtle",
+        className: "bg-info-subtle text-info-subtle-foreground border-info/20 [a&]:hover:bg-info-subtle/80",
+      },
+      {
+        variant: "info",
+        mode: "outline",
+        className: "border-info text-info [a&]:hover:bg-info/10",
+      },
+    ],
+    defaultVariants: {
+      variant: "default",
+      mode: "solid",
+      size: "default",
+    },
+  }
+)
+
+function Badge({
+  className,
+  variant = "default",
+  mode = "solid",
+  size = "default",
+  asChild = false,
+  ...props
+}: React.ComponentProps<"span"> &
+  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : "span"
+
+  return (
+    <Comp
+      data-slot="badge"
+      data-variant={variant}
+      data-mode={mode}
+      data-size={size}
+      className={cn(badgeVariants({ variant, mode, size }), className)}
+      {...props}
+    />
+  )
+}
+
+export { Badge, badgeVariants }
