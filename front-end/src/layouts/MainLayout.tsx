@@ -2,6 +2,7 @@ import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Outlet } from "react-router-dom"
+import { FloatingAiChat } from "@/components/FloatingAiChat"
 
 export default function MainLayout() {
   return (
@@ -14,6 +15,7 @@ export default function MainLayout() {
             <Outlet />
           </main>
         </div>
+        <FloatingAiChat />
       </SidebarInset>
     </SidebarProvider>
   )

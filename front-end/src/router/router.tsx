@@ -7,6 +7,8 @@ import ForbiddenPage from '@/pages/error/ForbiddenPage';
 import NotFoundPage from '@/pages/error/NotFoundPage';
 import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
+import DcaBacktestPage from '@/pages/DcaBacktestPage';
+import AiChatPage from '@/pages/AiChatPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 /** Breadcrumb label per route — change here to update header breadcrumbs. */
@@ -46,12 +48,17 @@ export const router = createBrowserRouter([
         ...breadcrumb('Dashboard'),
       },
       {
-        path: 'ai-setup',
-        ...breadcrumb('AI Setup'),
+        path: 'backtest',
+        element: <DcaBacktestPage />,
+        ...breadcrumb('DCA Backtest'),
+      },
+      {
+        path: 'ai-advisor',
+        ...breadcrumb('AI Advisor'),
         children: [
           {
             index: true,
-            element: <div className="p-8">AI Setup Dashboard (Under Construction)</div>,
+            element: <div className="p-8">AI Advisor Dashboard (Under Construction)</div>,
             ...breadcrumb('Dashboard'),
           },
           {
@@ -63,6 +70,11 @@ export const router = createBrowserRouter([
             path: 'settings',
             element: <div className="p-8">AI Settings Page</div>,
             ...breadcrumb('Settings'),
+          },
+          {
+            path: 'chat',
+            element: <AiChatPage />,
+            ...breadcrumb('AI Chat Studio'),
           },
         ],
       },
