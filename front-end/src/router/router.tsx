@@ -6,6 +6,8 @@ import SignUpPage from '@/pages/auth/SignUpPage';
 import ForbiddenPage from '@/pages/error/ForbiddenPage';
 import NotFoundPage from '@/pages/error/NotFoundPage';
 import HomePage from '@/pages/HomePage';
+import PortfolioPage from '@/pages/PortfolioPage';
+import SettingsPage from '@/pages/SettingsPage';
 import LandingPage from '@/pages/LandingPage';
 import DcaBacktestPage from '@/pages/DcaBacktestPage';
 import AiChatPage from '@/pages/AiChatPage';
@@ -46,6 +48,11 @@ export const router = createBrowserRouter([
         index: true,
         element: <HomePage />,
         ...breadcrumb('Dashboard'),
+      },
+      {
+        path: 'portfolio',
+        element: <PortfolioPage />,
+        ...breadcrumb('Portfolio'),
       },
       {
         path: 'backtest',
@@ -109,6 +116,11 @@ export const router = createBrowserRouter([
             ],
           },
         ],
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
+        ...breadcrumb('Settings'),
       },
       {
         path: '403',

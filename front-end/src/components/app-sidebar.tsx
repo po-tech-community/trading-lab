@@ -46,7 +46,7 @@ const data = {
         },
         {
           title: "Portfolios",
-          url: "/home/portfolios",
+          url: "/home/portfolio",
           icon: PieChart,
         },
       ],

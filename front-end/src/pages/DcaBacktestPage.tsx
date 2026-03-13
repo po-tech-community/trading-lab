@@ -379,6 +379,29 @@ export default function DcaBacktestPage() {
               </Card>
             </div>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Strategy presets (mock)</CardTitle>
+                <CardDescription>
+                  Quickly try a few common DCA configurations. These buttons do not change inputs yet.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2 text-sm">
+                <Button variant="outline" size="sm">
+                  BTC · $100 weekly · 1 year
+                </Button>
+                <Button variant="outline" size="sm">
+                  ETH · $50 weekly · 2 years
+                </Button>
+                <Button variant="outline" size="sm">
+                  AAPL · $200 monthly · 3 years
+                </Button>
+                <Button variant="outline" size="sm">
+                  TSLA · $100 bi-weekly · 18 months
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Main chart */}
             <Card className={cn(
               "flex-1 bg-card relative overflow-hidden",
