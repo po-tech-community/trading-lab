@@ -3,16 +3,15 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/common/PageHeader"
 
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Workspace settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Configure basic preferences for your TradingLab account. This page is mocked for now.
-        </p>
-      </header>
+      <PageHeader
+        title="Workspace settings"
+        description="Configure basic preferences for your TradingLab account. This page is mocked for now."
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -34,27 +33,36 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Preferences</CardTitle>
-            <CardDescription>These switches are non-functional for now.</CardDescription>
+            <CardTitle className="text-base">Notifications &amp; alerts</CardTitle>
+            <CardDescription>Control how we keep you updated about your account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-0.5">
-                <Label htmlFor="dark-mode">Dark mode</Label>
+                <Label htmlFor="email-alerts">Email summaries</Label>
                 <p className="text-sm text-muted-foreground">
-                  Follow system theme or stay in dark mode.
-                </p>
-              </div>
-              <Switch id="dark-mode" />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="email-alerts">Email alerts</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive summary emails for major portfolio moves.
+                  Receive a periodic summary of portfolio performance and major changes.
                 </p>
               </div>
               <Switch id="email-alerts" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="trade-alerts">Trade alerts</Label>
+                <p className="text-sm text-muted-foreground">
+                  Get notified when a backtest or live strategy hits key thresholds.
+                </p>
+              </div>
+              <Switch id="trade-alerts" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="product-updates">Product updates</Label>
+                <p className="text-sm text-muted-foreground">
+                  Occasionally hear about new features and improvements.
+                </p>
+              </div>
+              <Switch id="product-updates" />
             </div>
           </CardContent>
         </Card>

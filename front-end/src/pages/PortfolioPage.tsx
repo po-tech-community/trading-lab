@@ -1,19 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/common/PageHeader"
 
 export default function PortfolioPage() {
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Portfolio overview</h1>
-          <p className="text-sm text-muted-foreground">
-            High-level snapshot of your current holdings and DCA strategies.
-          </p>
-        </div>
-        <Button variant="outline">Export summary</Button>
-      </header>
+      <PageHeader
+        title="Portfolio overview"
+        description="High-level snapshot of your current holdings and DCA strategies."
+        actions={<Button variant="outline">Export summary</Button>}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

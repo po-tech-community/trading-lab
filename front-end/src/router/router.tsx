@@ -8,6 +8,7 @@ import NotFoundPage from '@/pages/error/NotFoundPage';
 import HomePage from '@/pages/HomePage';
 import PortfolioPage from '@/pages/PortfolioPage';
 import SettingsPage from '@/pages/SettingsPage';
+import MarketDataPage from '@/pages/MarketDataPage';
 import LandingPage from '@/pages/LandingPage';
 import DcaBacktestPage from '@/pages/DcaBacktestPage';
 import AiChatPage from '@/pages/AiChatPage';
@@ -65,8 +66,13 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <div className="p-8">AI Advisor Dashboard (Under Construction)</div>,
-            ...breadcrumb('Dashboard'),
+            element: <AiChatPage />,
+            ...breadcrumb('AI Advisor'),
+          },
+          {
+            path: 'chat',
+            element: <Navigate to="/home/ai-advisor" replace />,
+            ...breadcrumb('AI Advisor'),
           },
           {
             path: 'create-model',
@@ -78,12 +84,12 @@ export const router = createBrowserRouter([
             element: <div className="p-8">AI Settings Page</div>,
             ...breadcrumb('Settings'),
           },
-          {
-            path: 'chat',
-            element: <AiChatPage />,
-            ...breadcrumb('AI Chat Studio'),
-          },
         ],
+      },
+      {
+        path: 'market',
+        element: <MarketDataPage />,
+        ...breadcrumb('Market Data'),
       },
       {
         path: 'users',
