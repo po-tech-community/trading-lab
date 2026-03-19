@@ -12,7 +12,7 @@
 
 import { Body, Controller, Post, Res } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -22,7 +22,7 @@ import { Public } from '../common/decorators/public.decorator';
 @Controller('auth')
 @Public()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   private setRefreshTokenCookie(res: Response, refreshToken: string): void {
     const isProd = process.env.NODE_ENV === 'production';

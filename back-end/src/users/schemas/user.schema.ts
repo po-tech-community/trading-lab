@@ -20,7 +20,7 @@ export class User {
   @Prop()
   avatarUrl?: string;
 
-  @Prop({ default: null })
+  @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 
   createdAt: Date;
