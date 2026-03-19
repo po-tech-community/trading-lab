@@ -40,7 +40,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private toAuthUser(user: UserDocument): AuthUser {
     return {
@@ -113,5 +113,28 @@ export class AuthService {
     const refreshToken = this.signRefreshToken(payload);
 
     return { user, accessToken, refreshToken };
+  }
+
+  async refresh(
+    refreshToken: string,
+  ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
+    let payload: { sub: string; email: string };
+
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const newPayload = { sub: user.id, email: user.email };
+    const accessToken = this.signAccessToken(newPayload);
+    const newRefreshToken = this.signRefreshToken(newPayload);
+
+    return { user: this.toAuthUser(user), accessToken, refreshToken: newRefreshToken };
   }
 }

@@ -10,7 +10,7 @@
  * @see doc/developer-tasks.md L0-BE-4, L0-BE-5
  */
 
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -53,6 +53,20 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.authService.login(dto).then(({ user, accessToken, refreshToken }) => {
+      this.setRefreshTokenCookie(res, refreshToken);
+      return { user, accessToken };
+    });
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token (public)' })
+  @ApiResponse({ status: 200, description: 'New access token returned' })
+  @ApiResponse({ status: 401, description: 'Refresh token missing or invalid' })
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token = (req as any).cookies?.refreshToken;
+    if (!token) throw new UnauthorizedException('Refresh token missing');
+
+    return this.authService.refresh(token).then(({ user, accessToken, refreshToken }) => {
       this.setRefreshTokenCookie(res, refreshToken);
       return { user, accessToken };
     });
