@@ -20,6 +20,9 @@ export class User {
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
 
+  @Prop()
+  googleId?: string;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 

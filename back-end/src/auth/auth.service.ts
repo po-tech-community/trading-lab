@@ -21,13 +21,31 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
+import { UserDocument } from '../users/schemas/user.schema';
+import { AuditService } from 'src/audit/audit.service';
 
 export interface AuthUser {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  avatarUrl: string | null;
+  avatarUrl?: string;
+  googleId?: string;
+}
+
+export interface GoogleProfile {
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string;
+  googleId: string;
+}
+
+export async function comparePassword(
+  plain: string,
+  hash: string,
+): Promise<boolean> {
+  return bcrypt.compare(plain, hash);
 }
 
 @Injectable()
@@ -36,7 +54,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly auditService: AuditService,
+  ) { }
+
+  private async hashPassword(password: string): Promise<string> {
+    const saltRounds = Number(
+      this.configService.get<number>('BCRYPT_SALT_ROUNDS') ?? 10,
+    );
+    return bcrypt.hash(password, saltRounds);
+  }
 
   private signAccessToken(payload: { sub: string; email: string }): string {
     return this.jwtService.sign(payload, {
@@ -64,16 +90,18 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      avatarUrl: user.avatarUrl ?? null,
+      avatarUrl: user.avatarUrl ?? undefined,
     };
   }
 
   async register(
     dto: RegisterDto,
+    ip?: string,
   ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
-    const existingUser = await this.usersService.findByEmail(dto.email);
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) {
+      await this.auditService.log({event: 'REGISTER', email: dto.email, ip, metadata: {reason: 'email_already_registered'}});
+      throw new ConflictException('Email already registered');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -92,46 +120,45 @@ export class AuthService {
 
     const accessToken = this.signAccessToken(payload);
     const refreshToken = this.signRefreshToken(payload);
+    const authUser = this.toAuthUser(user)
+    await this.auditService.log({event: 'REGISTER', userId: authUser.id, email: authUser.email, ip})
 
-    return {
-      user: this.toAuthUser(user),
-      accessToken,
-      refreshToken,
-    };
+    return { user: authUser, accessToken, refreshToken };
+  }
+
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<AuthUser | null> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) return null;
+    const isValid = await comparePassword(password, user.passwordHash);
+    if (!isValid) return null;
+    return this.toAuthUser(user);
   }
 
   async login(
     dto: LoginDto,
+    ip?: string,
   ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
-    const user = await this.usersService.findByEmail(dto.email);
-
+    const user = await this.validateUser(dto.email, dto.password);
     if (!user) {
+      await this.auditService.log({event: 'LOGIN', email: dto.email, ip, metadata: {reason: 'invalid_credentials'}});
       throw new UnauthorizedException('Invalid email or password');
     }
-
-    const isValidPassword = await bcrypt.compare(dto.password, user.passwordHash);
-
-    if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
-
+    
+    const payload = {sub: user.id, email: user.email}
     const accessToken = this.signAccessToken(payload);
     const refreshToken = this.signRefreshToken(payload);
 
-    return {
-      user: this.toAuthUser(user),
-      accessToken,
-      refreshToken,
-    };
+    await this.auditService.log({event: 'LOGIN', userId: user.id, email: user.email, ip})
+
+    return { user, accessToken, refreshToken };
   }
 
   async refresh(
     refreshToken: string,
+    ip?: string,
   ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
     let payload: { sub: string; email: string };
 
@@ -140,16 +167,57 @@ export class AuthService {
         secret: this.configService.getOrThrow<string>('JWT_SECRET'),
       });
     } catch {
+      await this.auditService.log({event: 'REFRESH', ip, metadata: {reason: 'invalid_or_expired_token'}})
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     const user = await this.usersService.findById(payload.sub);
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) {
+      await this.auditService.log({event:'REFRESH', userId: payload.sub, ip, metadata: {reason: 'user_not_found'}})
+      throw new UnauthorizedException('User not found');
+    }
 
     const newPayload = { sub: user.id, email: user.email };
     const accessToken = this.signAccessToken(newPayload);
     const newRefreshToken = this.signRefreshToken(newPayload);
 
+    await this.auditService.log({event: 'REFRESH', userId: user.id, email: user.email, ip})
+
     return { user: this.toAuthUser(user), accessToken, refreshToken: newRefreshToken };
+  }
+
+  async logout(userId: string, ip?: string): Promise<void> {
+    await this.auditService.log({event: 'LOGOUT', userId, ip})
+  }
+
+  async googleLogin(
+    profile: GoogleProfile,
+    ip?: string,
+  ): Promise<{user: AuthUser; accessToken: string; refreshToken: string}> {
+    let user = await this.usersService.findByEmail(profile.email);
+
+    if (!user) {
+      user = await this.usersService.create({
+        email: profile.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        avatarUrl: profile.avatarUrl,
+        googleId: profile.googleId,
+        passwordHash: '',
+      });
+      await this.auditService.log({event: 'REGISTER', userId: user.id, email: user.email, ip, metadata: {provider: 'google'}})
+    } else {
+      if (!user.googleId) {
+        await this.usersService.update(user.id, {googleId: profile.googleId})
+      }
+      await this.auditService.log({event: 'LOGIN', userId: user.id, email: user.email, ip, metadata: {provider: 'google'}})
+    }
+
+    const authUser = this.toAuthUser(user);
+    const payload = {sub: authUser.id, email: authUser.email};
+    const accessToken = this.signAccessToken(payload);
+    const refreshToken = this.signRefreshToken(payload);
+
+    return {user: authUser, accessToken, refreshToken}
   }
 }

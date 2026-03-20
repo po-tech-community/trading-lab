@@ -13,6 +13,7 @@ import LandingPage from '@/pages/LandingPage';
 import DcaBacktestPage from '@/pages/DcaBacktestPage';
 import AiChatPage from '@/pages/AiChatPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import OAuthSuccessPage from '@/pages/auth/oAuthSuccessPage';
 
 /** Breadcrumb label per route — change here to update header breadcrumbs. */
 const breadcrumb = (label: string) => ({ handle: { breadcrumb: label } as const });
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
     path: '/log-in',
     element: <LoginPage />,
     ...breadcrumb('Log in'),
+  },
+  {
+    path: '/oath-succcess',
+    element: <OAuthSuccessPage />
   },
   {
     path: '/sign-up',

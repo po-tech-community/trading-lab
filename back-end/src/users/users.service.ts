@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+<<<<<<< HEAD
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
+=======
+import { User, UserDocument } from './schemas/user.schema';
+>>>>>>> 09e0664 (feat(audit logging + oauth): log auth events and implement OAuth with google)
 
 export interface CreateUserInput {
   email: string;
@@ -11,6 +15,10 @@ export interface CreateUserInput {
   lastName: string;
   passwordHash: string;
   avatarUrl?: string;
+<<<<<<< HEAD
+=======
+  googleId?: string;
+>>>>>>> 09e0664 (feat(audit logging + oauth): log auth events and implement OAuth with google)
 }
 
 @Injectable()
@@ -24,6 +32,8 @@ export class UsersService {
     lastName: string;
     email: string;
     passwordHash: string;
+    avatarUrl?: string | null;
+    googleId?: string;
   }): Promise<UserDocument> {
     const user = await this.userModel.create({
       firstName: data.firstName,
@@ -48,6 +58,7 @@ export class UsersService {
     });
   }
 
+<<<<<<< HEAD
   async update(id: string, dto: UpdateUserDto): Promise<UserDocument | null> {
     const { password, currentPassword, ...rest } = dto;
     const fields: Record<string, unknown> = { ...rest };
@@ -75,3 +86,20 @@ export class UsersService {
       .exec();
   }
 }
+=======
+  async update(id: string, updateData: Partial<User>): Promise<UserDocument> {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      updateData,
+      {new:true},
+    );
+
+    if (!user) {
+      throw new Error('User not found')
+    }
+
+    return user;
+  }
+}
+
+>>>>>>> 09e0664 (feat(audit logging + oauth): log auth events and implement OAuth with google)

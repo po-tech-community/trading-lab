@@ -17,6 +17,11 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+<<<<<<< HEAD
+=======
+import cookieParser from 'cookie-parser';
+import passport from 'passport';
+>>>>>>> fd1ab85 (feat(audit logging + oauth): log auth events and implement OAuth with google)
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,6 +34,11 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
   });
   app.setGlobalPrefix('api/v1');
+<<<<<<< HEAD
+=======
+  app.use(passport.initialize())
+  app.use(cookieParser());
+>>>>>>> fd1ab85 (feat(audit logging + oauth): log auth events and implement OAuth with google)
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.useGlobalPipes(
     new ValidationPipe({
