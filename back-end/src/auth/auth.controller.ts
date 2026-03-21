@@ -11,6 +11,7 @@
  */
 
 import { Body, Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -20,12 +21,17 @@ import { LoginDto } from './dto/login.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 201, description: 'User created and access token returned' })
+  @ApiResponse({ status: 409, description: 'Email already registered' })
+
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(dto);
     this.setRefreshTokenCookie(res, result.refreshToken);
@@ -39,7 +45,8 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 200, description: 'Access token returned' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
     this.setRefreshTokenCookie(res, result.refreshToken);
@@ -68,7 +75,7 @@ export class AuthController {
       httpOnly: true,
       sameSite: 'lax',
       secure: false,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: Number(this.configService.get('REFRESH_TOKEN_MAX_AGE')),
     });
   }
 }

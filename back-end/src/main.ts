@@ -23,10 +23,10 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: config.get<string>('FRONTEND_ORIGIN'),
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Authorization',
   });
   app.setGlobalPrefix('api/v1');
   app.useGlobalInterceptors(new LoggingInterceptor());
