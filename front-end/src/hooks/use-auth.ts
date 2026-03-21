@@ -26,11 +26,23 @@ type AuthResponse = {
   accessToken: string;
 };
 
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+type SignUpPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
+
 export function useLogin() {
   const navigate = useNavigate();
 
-  return useMutation<AuthResponse>({
-    mutationFn: async (data: any) => {
+  return useMutation<AuthResponse, Error, LoginPayload>({
+    mutationFn: async (data: LoginPayload) => {
       return apiClient<AuthResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify({
@@ -60,9 +72,9 @@ export function useLogin() {
 export function useSignUp() {
   const navigate = useNavigate();
 
-  return useMutation<AuthResponse>({
-    mutationFn: async (data: any) => {
-      return apiClient("/auth/register", {
+  return useMutation<AuthResponse, Error, SignUpPayload>({
+    mutationFn: async (data: SignUpPayload) => {
+      return apiClient<AuthResponse>("/auth/register", {
         method: "POST",
         body: JSON.stringify({
           email: data.email,
