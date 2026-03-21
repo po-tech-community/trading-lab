@@ -10,64 +10,103 @@
  * @see doc/developer-tasks.md L0-BE-2 (password hashing), L0-BE-4/5 (register/login)
  */
 
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-
-/** In-memory stub: replace with User model from DB (UsersModule) when implementing L0. */
-export interface StubUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  passwordHash: string;
-}
-
-export type AuthUser = Omit<StubUser, 'passwordHash'>;
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
-  private readonly users = new Map<string, StubUser>();
-  private idCounter = 1;
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly usersService: UsersService,
+  ) {}
 
-  constructor(private readonly jwtService: JwtService) {}
-
-  async register(dto: RegisterDto): Promise<{ user: AuthUser; accessToken: string }> {
-    const existing = Array.from(this.users.values()).find((u) => u.email === dto.email);
-    if (existing) throw new ConflictException('Email already registered');
+  async register(dto: RegisterDto) {
+    const existingUser = await this.usersService.findByEmail(dto.email);
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const id = String(this.idCounter++);
-    const user: StubUser = {
-      id,
-      email: dto.email,
+
+    const user = await this.usersService.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
+      email: dto.email,
       passwordHash,
+    });
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
     };
-    this.users.set(id, user);
 
-    const payload = { sub: user.id, email: user.email };
-    const accessToken = this.jwtService.sign(payload);
-    const { passwordHash: _, ...safe } = user;
-    return { user: safe, accessToken };
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      expiresIn: '7d',
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      accessToken,
+      refreshToken,
+    };
   }
 
-  async validateUser(email: string, password: string): Promise<AuthUser | null> {
-    const user = Array.from(this.users.values()).find((u) => u.email === email);
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) return null;
-    const { passwordHash: _, ...safe } = user;
-    return safe;
-  }
+  async login(dto: LoginDto) {
+    const user = await this.usersService.findByEmail(dto.email);
 
-  async login(dto: LoginDto): Promise<{ user: AuthUser; accessToken: string }> {
-    const user = await this.validateUser(dto.email, dto.password);
-    if (!user) throw new UnauthorizedException('Invalid email or password');
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
 
-    const payload = { sub: user.id, email: user.email };
-    const accessToken = this.jwtService.sign(payload);
-    return { user, accessToken };
+    const isValidPassword = await bcrypt.compare(dto.password, user.passwordHash);
+
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      expiresIn: '7d',
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      accessToken,
+      refreshToken,
+    };
   }
 }
