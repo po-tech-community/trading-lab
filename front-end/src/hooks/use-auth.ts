@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 /**
  * Mock Authentication Hook
@@ -101,6 +102,9 @@ async function refetchSession(): Promise<SessionState> {
 }
 export function useLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const from =
+    (location.state as any)?.from?.pathname || "/home";
 
   return useMutation<AuthResponse, Error, LoginPayload>({
     mutationFn: async (data: LoginPayload) => {
@@ -119,7 +123,7 @@ export function useLogin() {
         description: `Logged in as ${data.user.firstName ?? data.user.email}`,
       });
 
-      navigate("/home");
+      navigate(from, { replace: true });
     },
     onError: (error: Error) => {
       toast.error("Authentication Failed", {
