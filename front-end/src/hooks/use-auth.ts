@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
 
 /**
  * Mock Authentication Hook
@@ -8,46 +9,44 @@ import { toast } from "sonner";
  */
 
 // Mock credentials for testing
-const MOCK_USER = {
-  email: "admin@tradinglab.com",
-  password: "Password123",
-  firstName: "Trading",
-  lastName: "LabAdmin",
+// const MOCK_USER = {
+//   email: "admin@tradinglab.com",
+//   password: "Password123",
+//   firstName: "Trading",
+//   lastName: "LabAdmin",
+// };
+
+type AuthResponse = {
+  user: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  accessToken: string;
 };
 
 export function useLogin() {
   const navigate = useNavigate();
 
-  return useMutation({
+  return useMutation<AuthResponse>({
     mutationFn: async (data: any) => {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock validation
-      if (data.email === MOCK_USER.email && data.password === MOCK_USER.password) {
-        return {
-          user: {
-            id: "mock-id-123",
-            email: MOCK_USER.email,
-            firstName: MOCK_USER.firstName,
-            lastName: MOCK_USER.lastName,
-          },
-          accessToken: "mock-jwt-token-access",
-          refreshToken: "mock-jwt-token-refresh",
-        };
-      }
-
-      throw new Error("Invalid email or password. Please try again.");
+      return apiClient<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      });
     },
     onSuccess: (data) => {
-      // Persist mock session
       localStorage.setItem("accessToken", data.accessToken);
       localStorage.setItem("user", JSON.stringify(data.user));
-      
+
       toast.success("Welcome back!", {
-        description: `Logged in as ${data.user.firstName}`,
+        description: `Logged in as ${data.user.firstName ?? data.user.email}`,
       });
-      
+
       navigate("/home");
     },
     onError: (error: Error) => {
@@ -61,35 +60,26 @@ export function useLogin() {
 export function useSignUp() {
   const navigate = useNavigate();
 
-  return useMutation({
+  return useMutation<AuthResponse>({
     mutationFn: async (data: any) => {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock conflict check
-      if (data.email === MOCK_USER.email) {
-        throw new Error("This email is already registered.");
-      }
-
-      return {
-        user: {
-          id: "mock-new-id-" + Math.random().toString(36).substr(2, 9),
+      return apiClient("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
           email: data.email,
+          password: data.password,
           firstName: data.firstName,
           lastName: data.lastName,
-        },
-        accessToken: "mock-jwt-token-access-new",
-        refreshToken: "mock-jwt-token-refresh-new",
-      };
+        }),
+      });
     },
     onSuccess: (data) => {
       localStorage.setItem("accessToken", data.accessToken);
       localStorage.setItem("user", JSON.stringify(data.user));
-      
+
       toast.success("Account created!", {
         description: "Welcome to Trading Lab.",
       });
-      
+
       navigate("/home");
     },
     onError: (error: Error) => {
