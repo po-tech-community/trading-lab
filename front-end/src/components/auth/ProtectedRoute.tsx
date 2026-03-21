@@ -11,9 +11,11 @@ interface ProtectedRouteProps {
  * Preserves the attempted URL to redirect back after successful login.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, isLoading } = useSession();
   const location = useLocation();
-
+  if (isLoading) {
+    return <div className="p-6 text-center">Loading...</div>;
+  }
   if (!isAuthenticated) {
     // Redirect to login page but save the current location they were trying to go to
     return <Navigate to="/log-in" state={{ from: location }} replace />;

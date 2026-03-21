@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { useEffect, useState } from "react";
 
 /**
  * Mock Authentication Hook
@@ -26,6 +27,22 @@ type AuthResponse = {
   accessToken: string;
 };
 
+type SessionState = {
+  user: AuthResponse["user"] | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+};
+
+type RefreshResponse = {
+  user: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  accessToken: string;
+};
+
 type LoginPayload = {
   email: string;
   password: string;
@@ -38,6 +55,50 @@ type SignUpPayload = {
   password: string;
 };
 
+function saveSession(data: RefreshResponse | AuthResponse) {
+  localStorage.setItem("accessToken", data.accessToken);
+  localStorage.setItem("user", JSON.stringify(data.user));
+}
+
+function clearSession() {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("user");
+}
+
+async function refetchSession(): Promise<SessionState> {
+  const accessToken = localStorage.getItem("accessToken");
+  const userJson = localStorage.getItem("user");
+
+  if (accessToken && userJson) {
+    return {
+      user: JSON.parse(userJson),
+      isAuthenticated: true,
+      isLoading: false,
+    };
+  }
+
+  try {
+    const data = await apiClient<RefreshResponse>("/auth/refresh", {
+      method: "POST",
+    });
+
+    saveSession(data);
+
+    return {
+      user: data.user,
+      isAuthenticated: true,
+      isLoading: false,
+    };
+  } catch {
+    clearSession();
+
+    return {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+    };
+  }
+}
 export function useLogin() {
   const navigate = useNavigate();
 
@@ -52,8 +113,7 @@ export function useLogin() {
       });
     },
     onSuccess: (data) => {
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      saveSession(data);
 
       toast.success("Welcome back!", {
         description: `Logged in as ${data.user.firstName ?? data.user.email}`,
@@ -85,8 +145,7 @@ export function useSignUp() {
       });
     },
     onSuccess: (data) => {
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      saveSession(data);
 
       toast.success("Account created!", {
         description: "Welcome to Trading Lab.",
@@ -106,8 +165,7 @@ export function useLogout() {
   const navigate = useNavigate();
 
   const logout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
+    clearSession();
     toast.info("Logged out successfully");
     navigate("/log-in");
   };
@@ -116,12 +174,35 @@ export function useLogout() {
 }
 
 export function useSession() {
-  const userJson = localStorage.getItem("user");
-  const user = userJson ? JSON.parse(userJson) : null;
-  const isAuthenticated = !!localStorage.getItem("accessToken");
+  const [session, setSession] = useState<SessionState>(() => ({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+  }));
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      const nextSession = await refetchSession();
+      setSession(nextSession);
+    };
+
+    restoreSession();
+  }, []);
+
+  const refetch = async () => {
+    setSession((prev) => ({
+      ...prev,
+      isLoading: true,
+    }));
+
+    const nextSession = await refetchSession();
+    setSession(nextSession);
+
+    return nextSession;
+  };
 
   return {
-    user,
-    isAuthenticated,
+    ...session,
+    refetch,
   };
 }
