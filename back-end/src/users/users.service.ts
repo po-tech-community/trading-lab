@@ -39,5 +39,11 @@ export class UsersService {
       .findOne({ _id: id, deletedAt: null })
       .exec();
   }
+
+  async softDelete(id: string): Promise<void> {
+    await this.userModel
+      .findByIdAndUpdate(id, { deletedAt: new Date() })
+      .exec();
+  }
 }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -24,5 +24,15 @@ export class UsersController {
             lastName: user.lastName,
             avatarUrl: user.avatarUrl ?? null,
         };
+    }
+
+    @Delete('me')
+    @HttpCode(204)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Soft delete current user account (protected)' })
+    @ApiResponse({ status: 204, description: 'Account deleted' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async deleteMe(@CurrentUser() user: AuthUser) {
+        await this.usersService.softDelete(user.id);
     }
 }
