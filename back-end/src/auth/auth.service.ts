@@ -22,6 +22,14 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -30,7 +38,39 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  private signAccessToken(payload: { sub: string; email: string }): string {
+    return this.jwtService.sign(payload, {
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+    });
+  }
+
+  private signRefreshToken(payload: { sub: string; email: string }): string {
+    return this.jwtService.sign(payload, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      expiresIn: '7d',
+    });
+  }
+
+  private toAuthUser(user: {
+    id?: string;
+    _id?: unknown;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  }): AuthUser {
+    return {
+      id: user.id ?? String(user._id),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatarUrl: user.avatarUrl ?? null,
+    };
+  }
+
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
     const existingUser = await this.usersService.findByEmail(dto.email);
     if (existingUser) {
       throw new ConflictException('Email already exists');
@@ -50,28 +90,19 @@ export class AuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    });
-
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: '7d',
-    });
+    const accessToken = this.signAccessToken(payload);
+    const refreshToken = this.signRefreshToken(payload);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
+      user: this.toAuthUser(user),
       accessToken,
       refreshToken,
     };
   }
 
-  async login(dto: LoginDto) {
+  async login(
+    dto: LoginDto,
+  ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user) {
@@ -89,24 +120,36 @@ export class AuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    });
-
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: '7d',
-    });
+    const accessToken = this.signAccessToken(payload);
+    const refreshToken = this.signRefreshToken(payload);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
+      user: this.toAuthUser(user),
       accessToken,
       refreshToken,
     };
+  }
+
+  async refresh(
+    refreshToken: string,
+  ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
+    let payload: { sub: string; email: string };
+
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const newPayload = { sub: user.id, email: user.email };
+    const accessToken = this.signAccessToken(newPayload);
+    const newRefreshToken = this.signRefreshToken(newPayload);
+
+    return { user: this.toAuthUser(user), accessToken, refreshToken: newRefreshToken };
   }
 }

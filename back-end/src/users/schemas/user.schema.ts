@@ -21,7 +21,11 @@ export class User {
   avatarUrl: string | null;
 
   @Prop({ type: Date, default: null })
-  deletedAt: Date | null;
+  deletedAt?: Date | null;
+
+  createdAt: Date;
+
+  updatedAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
