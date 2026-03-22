@@ -1,9 +1,10 @@
-import { Controller, Delete, Get, HttpCode, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Delete, Get, HttpCode, UseGuards, Body, Patch } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import type { AuthUser } from '../auth/auth.service';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -34,5 +35,22 @@ export class UsersController {
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     async deleteMe(@CurrentUser() user: AuthUser) {
         await this.usersService.softDelete(user.id);
+    }
+ 
+    @Patch('me')
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Update current user profile (protected)' })
+    @ApiBody({ type: UpdateUserDto })
+    @ApiResponse({ status: 200, description: 'User updated' })
+    @ApiResponse({ status: 401, description: 'Unauthorized' })
+    async updateMe(@CurrentUser() user: AuthUser, @Body() dto: UpdateUserDto) {
+        const updated = await this.usersService.update(user.id, dto);
+        return {
+            id: updated!.id,
+            email: updated!.email,
+            firstName: updated!.firstName,
+            lastName: updated!.lastName,
+            avatarUrl: updated!.avatarUrl ?? null,
+        };
     }
 }
