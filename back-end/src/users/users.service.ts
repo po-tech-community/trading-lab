@@ -1,8 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User, UserDocument } from './schemas/user.schema.js';
-import { NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { User, UserDocument } from './schemas/user.schema';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+export interface CreateUserInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  passwordHash: string;
+  avatarUrl?: string;
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -29,6 +39,19 @@ export class UsersService {
       email: email.toLowerCase(),
       deletedAt: null,
     });
+  }
+
+  async findDocumentById(userId: string): Promise<UserDocument> {
+    const user = await this.userModel.findOne({
+      _id: userId,
+      deletedAt: null,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 
   async findById(userId: string) {
@@ -132,5 +155,32 @@ export class UsersService {
       firstName: updatedUser.firstName ?? '',
       lastName: updatedUser.lastName ?? '',
     };
+  }
+
+  async update(id: string, dto: UpdateUserDto): Promise<UserDocument | null> {
+    const { password, currentPassword, ...rest } = dto;
+    const fields: Record<string, unknown> = { ...rest };
+
+    if (password) {
+      if (!currentPassword) {
+        throw new BadRequestException('Current password is required to set a new password');
+      }
+      const user = await this.findDocumentById(id);
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash!);
+      if (!isValid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+      fields.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    return this.userModel
+      .findByIdAndUpdate(id, fields, { new: true })
+      .exec();
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.userModel
+      .findByIdAndUpdate(id, { deletedAt: new Date() })
+      .exec();
   }
 }
