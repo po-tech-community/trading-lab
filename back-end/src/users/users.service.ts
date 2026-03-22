@@ -19,27 +19,33 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async create(input: CreateUserInput): Promise<UserDocument> {
-    const user = new this.userModel({
-      email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      passwordHash: input.passwordHash,
-      avatarUrl: input.avatarUrl,
+  async create(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    passwordHash: string;
+  }): Promise<UserDocument> {
+    const user = await this.userModel.create({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email.toLowerCase(),
+      passwordHash: data.passwordHash,
     });
-    return user.save();
+    return user;
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ email, deletedAt: null })
-      .exec();
+    return this.userModel.findOne({
+      email: email.toLowerCase(),
+      deletedAt: null,
+    });
   }
 
   async findById(id: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ _id: id, deletedAt: null })
-      .exec();
+    return this.userModel.findOne({
+      _id: id,
+      deletedAt: null,
+    });
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<UserDocument | null> {
@@ -63,4 +69,3 @@ export class UsersService {
       .exec();
   }
 }
-

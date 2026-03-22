@@ -11,64 +11,71 @@
  */
 
 import { Body, Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { Public } from '../common/decorators/public.decorator';
 
-@ApiTags('auth')
+@ApiTags('Auth')
 @Controller('auth')
-@Public()
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
-
-  private setRefreshTokenCookie(res: Response, refreshToken: string): void {
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      path: '/',
-    });
-  }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
-  @ApiOperation({ summary: 'Register (public)' })
+  @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'User created and access token returned' })
   @ApiResponse({ status: 409, description: 'Email already registered' })
-  register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    return this.authService.register(dto).then(({ user, accessToken, refreshToken }) => {
-      this.setRefreshTokenCookie(res, refreshToken);
-      return { user, accessToken };
-    });
+
+  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.register(dto);
+    this.setRefreshTokenCookie(res, result.refreshToken);
+
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+    };
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login (public)' })
+  @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Access token returned' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    return this.authService.login(dto).then(({ user, accessToken, refreshToken }) => {
-      this.setRefreshTokenCookie(res, refreshToken);
-      return { user, accessToken };
-    });
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+    this.setRefreshTokenCookie(res, result.refreshToken);
+
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+    };
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token (public)' })
   @ApiResponse({ status: 200, description: 'New access token returned' })
   @ApiResponse({ status: 401, description: 'Refresh token missing or invalid' })
-  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req as any).cookies?.refreshToken;
     if (!token) throw new UnauthorizedException('Refresh token missing');
 
-    return this.authService.refresh(token).then(({ user, accessToken, refreshToken }) => {
-      this.setRefreshTokenCookie(res, refreshToken);
-      return { user, accessToken };
+    const { user, accessToken, refreshToken } = await this.authService.refresh(token);
+    this.setRefreshTokenCookie(res, refreshToken);
+    return { user, accessToken };
+  }
+
+  private setRefreshTokenCookie(res: Response, token: string): void {
+    res.cookie('refreshToken', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      maxAge: Number(this.configService.get('REFRESH_TOKEN_MAX_AGE')),
     });
   }
 }
