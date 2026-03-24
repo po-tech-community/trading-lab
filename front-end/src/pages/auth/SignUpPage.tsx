@@ -23,6 +23,10 @@ const signUpSchema = z.object({
 
 type SignUpValues = z.infer<typeof signUpSchema>
 
+const googleAuthUrl = `${
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+}/auth/google`
+
 export default function SignUpPage() {
   const signUpMutation = useSignUp()
 
@@ -41,7 +45,7 @@ export default function SignUpPage() {
   }
 
   const handleGoogleSignUp = () => {
-    console.log("Signing up with Google...")
+    window.location.href = googleAuthUrl
   }
 
   return (

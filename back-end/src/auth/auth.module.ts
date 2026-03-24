@@ -29,12 +29,8 @@ import { GoogleStrategy } from './google/google.strategy';
 
 @Module({
   imports: [
-<<<<<<< HEAD
-    ConfigModule,
-=======
     UsersModule,
     AuditModule,
->>>>>>> fd1ab85 (feat(audit logging + oauth): log auth events and implement OAuth with google)
     PassportModule.register({ defaultStrategy: 'jwt' }),
     UsersModule,
     JwtModule.registerAsync({
@@ -48,12 +44,7 @@ import { GoogleStrategy } from './google/google.strategy';
     }),
   ],
   controllers: [AuthController],
-<<<<<<< HEAD
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
-=======
   providers: [AuthService, JwtStrategy, GoogleStrategy],
   exports: [AuthService, JwtStrategy],
->>>>>>> fd1ab85 (feat(audit logging + oauth): log auth events and implement OAuth with google)
 })
 export class AuthModule {}

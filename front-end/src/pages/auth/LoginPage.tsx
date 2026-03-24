@@ -21,6 +21,10 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>
 
+const googleAuthUrl = `${
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+}/auth/google`
+
 export default function LoginPage() {
   const loginMutation = useLogin()
 
@@ -37,7 +41,7 @@ export default function LoginPage() {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:8000/api/v1/auth/google";
+    window.location.href = googleAuthUrl
   }
 
   return (

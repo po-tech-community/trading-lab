@@ -97,10 +97,15 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const result = await this.authService.googleLogin(req.user as GoogleProfile);
-    res.cookie('refreshToken', result.refreshToken, {httpOnly: true})
+    const result = await this.authService.googleLogin(
+      req.user as GoogleProfile,
+      this.getIp(req),
+    );
+    const frontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000';
+    const user = encodeURIComponent(JSON.stringify(result.user));
+    this.setRefreshTokenCookie(res, result.refreshToken);
     return res.redirect(
-      `http://localhost:3000/oauth-success?token=${result.accessToken}`
+      `${frontendOrigin}/oauth-success?token=${result.accessToken}&user=${user}`
     );
   }
 }

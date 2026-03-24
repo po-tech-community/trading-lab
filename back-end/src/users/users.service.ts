@@ -33,6 +33,8 @@ export class UsersService {
       lastName: data.lastName,
       email: data.email.toLowerCase(),
       passwordHash: data.passwordHash,
+      avatarUrl: data.avatarUrl ?? null,
+      googleId: data.googleId,
     });
     return user;
   }
@@ -65,4 +67,3 @@ export class UsersService {
     return user;
   }
 }
-

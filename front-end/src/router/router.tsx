@@ -29,7 +29,7 @@ export const router = createBrowserRouter([
     ...breadcrumb('Log in'),
   },
   {
-    path: '/oath-succcess',
+    path: '/oauth-success',
     element: <OAuthSuccessPage />
   },
   {
