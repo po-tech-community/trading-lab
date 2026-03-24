@@ -76,13 +76,18 @@ export class PriceService {
         const from = Math.floor(new Date(startDate).getTime() / 1000);
         const to = Math.floor(new Date(endDate).getTime() / 1000);
 
+        const apiKey = this.configService.get<string>('COINGECKO_API_KEY');
         const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
 
         this.logger.log(`Fetching CoinGecko prices for ${symbol} from ${startDate} to ${endDate}`);
 
         let data: any;
         try {
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: {
+                    'x-cg-demo-api-key': apiKey ?? '',
+                },
+            });
 
             // CoinGecko returns 429 when rate limited
             if (res.status === 429) {
@@ -150,8 +155,7 @@ export class PriceService {
             );
         }
 
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=full&apikey=${apiKey}`;
-
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
         this.logger.log(`Fetching AlphaVantage prices for ${symbol} from ${startDate} to ${endDate}`);
 
         let data: any;
@@ -165,6 +169,7 @@ export class PriceService {
             }
 
             data = await res.json();
+
         } catch (err) {
             if (
                 err instanceof InternalServerErrorException ||
@@ -176,7 +181,6 @@ export class PriceService {
                 'Failed to reach AlphaVantage API. Please try again later.',
             );
         }
-
         // AlphaVantage returns this message when rate limited (25/day on free tier)
         if (data['Information'] || data['Note']) {
             throw new InternalServerErrorException(
@@ -203,7 +207,7 @@ export class PriceService {
             })
             .map(([date, values]: [string, any]) => ({
                 date,
-                close: parseFloat(values['5. adjusted close']),
+                close: parseFloat(values['4. close']),
             }))
             .sort((a, b) => a.date.localeCompare(b.date)); // oldest → newest
 

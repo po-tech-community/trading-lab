@@ -10,8 +10,10 @@
 
 import { Module } from '@nestjs/common';
 import { PriceService } from './price.service';
+import { BacktestController } from './backtest.controller';
 
 @Module({
+    controllers: [BacktestController],
     providers: [PriceService],
     exports: [PriceService],
 })
