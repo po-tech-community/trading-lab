@@ -21,6 +21,7 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit/audit.service';
 
 export interface AuthUser {
   id: string;
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly auditService: AuditService,
   ) {}
 
   private signAccessToken(payload: { sub: string; email: string }): string {
@@ -92,9 +94,14 @@ export class AuthService {
 
     const accessToken = this.signAccessToken(payload);
     const refreshToken = this.signRefreshToken(payload);
+    const authUser = this.toAuthUser(user);
+
+    await this.auditService.logAuthEvent('register', authUser.id, {
+      email: authUser.email,
+    });
 
     return {
-      user: this.toAuthUser(user),
+      user: authUser,
       accessToken,
       refreshToken,
     };
@@ -125,9 +132,14 @@ export class AuthService {
 
     const accessToken = this.signAccessToken(payload);
     const refreshToken = this.signRefreshToken(payload);
+    const authUser = this.toAuthUser(user);
+
+    await this.auditService.logAuthEvent('login', authUser.id, {
+      email: authUser.email,
+    });
 
     return {
-      user: this.toAuthUser(user),
+      user: authUser,
       accessToken,
       refreshToken,
     };
@@ -152,11 +164,16 @@ export class AuthService {
     const newPayload = { sub: user.id, email: user.email };
     const accessToken = this.signAccessToken(newPayload);
     const newRefreshToken = this.signRefreshToken(newPayload);
+    const authUser = this.toAuthUser(user);
 
-    return {
-      user: this.toAuthUser(user),
-      accessToken,
-      refreshToken: newRefreshToken,
-    };
+    await this.auditService.logAuthEvent('refresh', authUser.id, {
+      email: authUser.email,
+    });
+
+    return { user: authUser, accessToken, refreshToken: newRefreshToken };
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.auditService.logAuthEvent('logout', userId);
   }
 }

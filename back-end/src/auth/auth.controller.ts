@@ -10,13 +10,16 @@
  * @see doc/developer-tasks.md L0-BE-4, L0-BE-5
  */
 
-import { Body, Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthUser } from './auth.service';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -70,12 +73,36 @@ export class AuthController {
     return { user, accessToken };
   }
 
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout current user' })
+  @ApiResponse({ status: 200, description: 'User logged out and refresh cookie cleared' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async logout(
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.logout(user.id);
+    this.clearRefreshTokenCookie(res);
+
+    return { message: 'Logged out successfully' };
+  }
+
   private setRefreshTokenCookie(res: Response, token: string): void {
     res.cookie('refreshToken', token, {
       httpOnly: true,
       sameSite: 'lax',
       secure: false,
       maxAge: Number(this.configService.get('REFRESH_TOKEN_MAX_AGE')),
+    });
+  }
+
+  private clearRefreshTokenCookie(res: Response): void {
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
     });
   }
 }
