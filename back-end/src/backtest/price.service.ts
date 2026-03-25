@@ -18,9 +18,13 @@ import {
     Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+    dateStringToEpochMs,
+    epochMsToDateString,
+} from '../common/helpers/date.helper';
 
 export interface PricePoint {
-    date: string;  // 'YYYY-MM-DD'
+    date: number; // epoch milliseconds e.g. 1735689600000
     close: number;
 }
 
@@ -43,8 +47,8 @@ export class PriceService {
      */
     async fetchPrices(
         symbol: string,
-        startDate: string,
-        endDate: string,
+        startDate: number,
+        endDate: number,
     ): Promise<PricePoint[]> {
         const upper = symbol.toUpperCase();
 
@@ -64,17 +68,29 @@ export class PriceService {
     // ---------------------------------------------------------------------------
     // CoinGecko – crypto prices
     // ---------------------------------------------------------------------------
+    /**
+   * Fetches historical prices from CoinGecko API.
+   *
+   * Flow:
+   * 1. Convert epoch ms to Unix seconds (CoinGecko requires seconds, not ms)
+   * 2. Build URL with coin ID (e.g. 'bitcoin'), from/to, send API key in header
+   * 3. Handle rate limit (429) and other HTTP errors
+   * 4. Parse response: CoinGecko returns [[timestamp_ms, price], ...]
+   * 5. Deduplicate — keep only one entry per day (CoinGecko may return multiple)
+   * 6. Store each day as UTC midnight epoch ms for consistency
+   * 7. Return array of { date: epoch_ms, close }
+   */
 
     private async fetchFromCoinGecko(
         symbol: string,
-        startDate: string,
-        endDate: string,
+        startDate: number,
+        endDate: number,
     ): Promise<PricePoint[]> {
         const coinId = COINGECKO_SYMBOLS[symbol];
 
         // CoinGecko uses Unix timestamps (seconds)
-        const from = Math.floor(new Date(startDate).getTime() / 1000);
-        const to = Math.floor(new Date(endDate).getTime() / 1000);
+        const from = Math.floor(startDate / 1000);
+        const to = Math.floor(endDate / 1000);
 
         const apiKey = this.configService.get<string>('COINGECKO_API_KEY');
         const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
@@ -128,10 +144,10 @@ export class PriceService {
         const result: PricePoint[] = [];
 
         for (const [timestampMs, price] of data.prices) {
-            const date = new Date(timestampMs).toISOString().split('T')[0]; // 'YYYY-MM-DD'
-            if (!seen.has(date)) {
-                seen.add(date);
-                result.push({ date, close: price });
+            const dayKey = epochMsToDateString(timestampMs);
+            if (!seen.has(dayKey)) {
+                seen.add(dayKey);
+                result.push({ date: dateStringToEpochMs(dayKey), close: price });
             }
         }
 
@@ -141,11 +157,24 @@ export class PriceService {
     // ---------------------------------------------------------------------------
     // AlphaVantage – stock prices
     // ---------------------------------------------------------------------------
+    /**
+   * Fetches historical prices from AlphaVantage API.
+   *
+   * Flow:
+   * 1. Check API key is configured in .env
+   * 2. Call TIME_SERIES_DAILY with outputsize=compact (last 100 trading days, free tier)
+   * 3. Handle rate limit — AlphaVantage returns 200 with an 'Information' or 'Note'
+   *    field when limited instead of using HTTP 429, so must check manually
+   * 4. Parse 'Time Series (Daily)' object: keys are YYYY-MM-DD strings, values contain OHLC
+   * 5. Filter entries to the requested date range using epoch ms comparison
+   * 6. Convert date strings to epoch ms and parse the close price as a float
+   * 7. Sort oldest to newest (AlphaVantage returns newest first) and return
+   */
 
     private async fetchFromAlphaVantage(
         symbol: string,
-        startDate: string,
-        endDate: string,
+        startDate: number,
+        endDate: number,
     ): Promise<PricePoint[]> {
         const apiKey = this.configService.get<string>('ALPHAVANTAGE_API_KEY');
 
@@ -196,20 +225,16 @@ export class PriceService {
             );
         }
 
-        // Filter to date range and convert to { date, close }
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
         const result: PricePoint[] = Object.entries(timeSeries)
-            .filter(([date]) => {
-                const d = new Date(date);
-                return d >= start && d <= end;
+            .filter(([dateStr]) => {
+                const epochMs = dateStringToEpochMs(dateStr);
+                return epochMs >= startDate && epochMs <= endDate;
             })
-            .map(([date, values]: [string, any]) => ({
-                date,
+            .map(([dateStr, values]: [string, any]) => ({
+                date: dateStringToEpochMs(dateStr),
                 close: parseFloat(values['4. close']),
             }))
-            .sort((a, b) => a.date.localeCompare(b.date)); // oldest → newest
+            .sort((a, b) => a.date - b.date); // numeric sort instead of string sort
 
         if (result.length === 0) {
             throw new BadRequestException(
