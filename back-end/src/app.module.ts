@@ -23,6 +23,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TodosModule } from './todos/todos.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { BacktestModule } from './backtest/backtest.module';
 
 @Module({
   imports: [
@@ -35,26 +36,27 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     }),
     ...(process.env.REDIS_ENABLED === 'true'
       ? [
-          CacheModule.registerAsync({
-            isGlobal: true,
-            inject: [ConfigService],
-            useFactory: async (config: ConfigService) => {
-              const store = await redisStore({
-                socket: {
-                  host: config.get('REDIS_HOST', 'localhost'),
-                  port: config.get('REDIS_PORT', 6379),
-                },
-                password: config.get('REDIS_PASSWORD') || undefined,
-                ttl: config.get('REDIS_TTL_MS', 60_000),
-              });
-              return { store };
-            },
-          }),
-        ]
+        CacheModule.registerAsync({
+          isGlobal: true,
+          inject: [ConfigService],
+          useFactory: async (config: ConfigService) => {
+            const store = await redisStore({
+              socket: {
+                host: config.get('REDIS_HOST', 'localhost'),
+                port: config.get('REDIS_PORT', 6379),
+              },
+              password: config.get('REDIS_PASSWORD') || undefined,
+              ttl: config.get('REDIS_TTL_MS', 60_000),
+            });
+            return { store };
+          },
+        }),
+      ]
       : [CacheModule.register({ isGlobal: true })]),
     AuthModule,
     UsersModule,
     TodosModule,
+    BacktestModule
   ],
   controllers: [AppController],
   providers: [AppService],
