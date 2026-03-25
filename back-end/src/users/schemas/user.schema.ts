@@ -17,6 +17,9 @@ export class User {
   @Prop({ required: true })
   passwordHash: string;
 
+  @Prop({ type: String, default: null, index: true })
+  googleId?: string | null;
+
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
 

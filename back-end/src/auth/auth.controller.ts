@@ -10,7 +10,7 @@
  * @see doc/developer-tasks.md L0-BE-4, L0-BE-5
  */
 
-import { Body, Controller, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
@@ -71,6 +71,30 @@ export class AuthController {
     const { user, accessToken, refreshToken } = await this.authService.refresh(token);
     this.setRefreshTokenCookie(res, refreshToken);
     return { user, accessToken };
+  }
+
+  @Get('google')
+  @ApiOperation({ summary: 'Redirect to Google OAuth consent screen' })
+  @ApiResponse({ status: 302, description: 'Redirects user to Google OAuth' })
+  googleAuth(@Res() res: Response) {
+    return res.redirect(this.authService.getGoogleAuthUrl());
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback' })
+  @ApiResponse({ status: 200, description: 'Returns user and access token after Google login' })
+  @ApiResponse({ status: 401, description: 'Invalid Google authorization code' })
+  async googleCallback(
+    @Query('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.loginWithGoogle(code);
+    this.setRefreshTokenCookie(res, result.refreshToken);
+
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+    };
   }
 
   @Post('logout')

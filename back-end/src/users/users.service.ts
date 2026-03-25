@@ -15,6 +15,7 @@ export interface CreateUserInput {
   firstName: string;
   lastName: string;
   passwordHash: string;
+  googleId?: string | null;
   avatarUrl?: string;
 }
 
@@ -29,12 +30,16 @@ export class UsersService {
     lastName: string;
     email: string;
     passwordHash: string;
+    googleId?: string | null;
+    avatarUrl?: string | null;
   }): Promise<UserDocument> {
     const user = await this.userModel.create({
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email.toLowerCase(),
       passwordHash: data.passwordHash,
+      googleId: data.googleId ?? null,
+      avatarUrl: data.avatarUrl ?? null,
     });
     return user;
   }
@@ -137,6 +142,30 @@ export class UsersService {
       firstName: updatedUser.firstName ?? '',
       lastName: updatedUser.lastName ?? '',
     };
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        googleId,
+        deletedAt: null,
+      })
+      .exec();
+  }
+
+  async linkGoogleAccount(
+    id: string,
+    googleId: string,
+    avatarUrl?: string | null,
+  ): Promise<UserDocument | null> {
+    const fields: Record<string, unknown> = { googleId };
+    if (avatarUrl !== undefined) {
+      fields.avatarUrl = avatarUrl;
+    }
+
+    return this.userModel
+      .findByIdAndUpdate(id, fields, { new: true })
+      .exec();
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<UserDocument | null> {
