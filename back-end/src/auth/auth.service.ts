@@ -107,16 +107,32 @@ export class AuthService {
     return this.configService.getOrThrow<string>('GOOGLE_CALLBACK_URL');
   }
 
-  getGoogleAuthUrl(): string {
+  private getFrontendGoogleCallbackUrl(): string {
+    const configuredUrl = this.configService.get<string>('FRONTEND_GOOGLE_CALLBACK_URL');
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+
+    const frontendOrigin = this.configService.getOrThrow<string>('FRONTEND_ORIGIN');
+    return `${frontendOrigin.replace(/\/$/, '')}/auth/google/callback`;
+  }
+
+  getGoogleAuthUrl(redirectToFrontend = false): string {
     const baseUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-    const params = new URLSearchParams({
+    const paramsObject: Record<string, string> = {
       client_id: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
       redirect_uri: this.getGoogleCallbackUrl(),
       response_type: 'code',
       scope: 'openid email profile',
       access_type: 'offline',
       prompt: 'consent',
-    });
+    };
+
+    if (redirectToFrontend) {
+      paramsObject.state = this.getFrontendGoogleCallbackUrl();
+    }
+
+    const params = new URLSearchParams(paramsObject);
 
     return `${baseUrl}?${params.toString()}`;
   }
@@ -333,5 +349,19 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  buildGoogleFrontendRedirectUrl(data: {
+    accessToken: string;
+    user: AuthUser;
+    redirectUrl?: string;
+  }): string {
+    const baseUrl = data.redirectUrl || this.getFrontendGoogleCallbackUrl();
+    const params = new URLSearchParams({
+      accessToken: data.accessToken,
+      user: encodeURIComponent(JSON.stringify(data.user)),
+    });
+
+    return `${baseUrl}?${params.toString()}`;
   }
 }

@@ -76,8 +76,8 @@ export class AuthController {
   @Get('google')
   @ApiOperation({ summary: 'Redirect to Google OAuth consent screen' })
   @ApiResponse({ status: 302, description: 'Redirects user to Google OAuth' })
-  googleAuth(@Res() res: Response) {
-    return res.redirect(this.authService.getGoogleAuthUrl());
+  googleAuth(@Query('redirect') redirect: string | undefined, @Res() res: Response) {
+    return res.redirect(this.authService.getGoogleAuthUrl(redirect === 'frontend'));
   }
 
   @Get('google/callback')
@@ -86,10 +86,21 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid Google authorization code' })
   async googleCallback(
     @Query('code') code: string,
+    @Query('state') state: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.loginWithGoogle(code);
     this.setRefreshTokenCookie(res, result.refreshToken);
+
+    if (state) {
+      return res.redirect(
+        this.authService.buildGoogleFrontendRedirectUrl({
+          accessToken: result.accessToken,
+          user: result.user,
+          redirectUrl: state,
+        }),
+      );
+    }
 
     return {
       user: result.user,

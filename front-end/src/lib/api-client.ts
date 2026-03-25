@@ -33,6 +33,7 @@ export async function apiClient<T>(
 
   const config: RequestInit = {
     ...options,
+    credentials: options.credentials ?? 'include',
     headers: {
       ...defaultHeaders,
       ...options.headers,
