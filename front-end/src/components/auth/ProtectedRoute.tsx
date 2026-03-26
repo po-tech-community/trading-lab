@@ -1,5 +1,6 @@
 import { useSession } from "@/hooks/use-auth";
 import { Navigate, useLocation } from "react-router-dom";
+import { LoadingState } from "@/components/common/LoadingState";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useSession();
   const location = useLocation();
   if (isLoading) {
-    return <div className="p-6 text-center">Loading...</div>;
+    return <LoadingState />;
   }
   if (!isAuthenticated) {
     // Redirect to login page but save the current location they were trying to go to

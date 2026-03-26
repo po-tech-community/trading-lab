@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -41,70 +46,47 @@ export class UsersService {
     });
   }
 
-  async findDocumentById(userId: string): Promise<UserDocument> {
-    const user = await this.userModel.findOne({
+  async findById(userId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({
       _id: userId,
       deletedAt: null,
     });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
   }
 
-  async findById(userId: string) {
-    const user = await this.userModel.findOne({
-      _id: userId,
-      deletedAt: null,
-    });
-  
-    if (!user) {
-      throw new NotFoundException('User not found');
+  async updateById(
+    userId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+    },
+  ) {
+    const updatedUser = await this.userModel.findOneAndUpdate(
+      {
+        _id: userId,
+        deletedAt: null,
+      },
+      {
+        ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+
+    if (!updatedUser) {
+      return null;
     }
-  
+
     return {
-      id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName ?? '',
-      lastName: user.lastName ?? '',
+      id: updatedUser._id.toString(),
+      email: updatedUser.email,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
     };
   }
 
-  async updateMe(
-  userId: string,
-  data: {
-    firstName?: string;
-    lastName?: string;
-  },
-) {
-  const updatedUser = await this.userModel.findOneAndUpdate(
-    {
-      _id: userId,
-      deletedAt: null,
-    },
-    {
-      ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
-      ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  );
-
-  if (!updatedUser) {
-    return null;
-  }
-
-  return {
-    id: updatedUser._id.toString(),
-    email: updatedUser.email,
-    firstName: updatedUser.firstName,
-    lastName: updatedUser.lastName,
-  };
-}
   async findProfileByEmail(email: string) {
     const user = await this.userModel.findOne({
       email,
@@ -122,8 +104,8 @@ export class UsersService {
       lastName: user.lastName ?? '',
     };
   }
-  
-  async updateMeByEmail(
+
+  async updateByEmail(
     email: string,
     data: {
       firstName?: string;
@@ -144,11 +126,11 @@ export class UsersService {
         runValidators: true,
       },
     );
-  
+
     if (!updatedUser) {
       throw new NotFoundException('User not found');
     }
-  
+
     return {
       id: updatedUser._id.toString(),
       email: updatedUser.email,
@@ -163,19 +145,22 @@ export class UsersService {
 
     if (password) {
       if (!currentPassword) {
-        throw new BadRequestException('Current password is required to set a new password');
+        throw new BadRequestException(
+          'Current password is required to set a new password',
+        );
       }
-      const user = await this.findDocumentById(id);
-      const isValid = await bcrypt.compare(currentPassword, user.passwordHash!);
+      const user = await this.findById(id);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
       if (!isValid) {
         throw new UnauthorizedException('Current password is incorrect');
       }
       fields.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    return this.userModel
-      .findByIdAndUpdate(id, fields, { new: true })
-      .exec();
+    return this.userModel.findByIdAndUpdate(id, fields, { new: true }).exec();
   }
 
   async softDelete(id: string): Promise<void> {

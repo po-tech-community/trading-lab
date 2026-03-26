@@ -1,6 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  MinLength,
+  MaxLength,
+  Matches,
+} from 'class-validator';
 
+/**
+ * DTO cho endpoint `PATCH /users`.
+ * Hỗ trợ cập nhật `firstName/lastName`, `avatarUrl` và đổi mật khẩu.
+ * Khi cung cấp `password` mới thì cần `currentPassword`.
+ */
 export class UpdateUserDto {
   @ApiPropertyOptional({ example: 'Jane' })
   @IsOptional()
