@@ -37,7 +37,15 @@ export default function SignUpPage() {
   })
 
   const onSubmit = async (data: SignUpValues) => {
-    signUpMutation.mutate(data)
+    form.clearErrors("root")
+  
+    signUpMutation.mutate(data, {
+      onError: (error: Error) => {
+        form.setError("root", {
+          message: error.message || "Failed to create account",
+        })
+      },
+    })
   }
 
   const handleGoogleSignUp = () => {
@@ -139,9 +147,20 @@ export default function SignUpPage() {
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full h-11" size="lg" loading={signUpMutation.isPending}>
-                        Create Account
+                    <Button
+                      type="submit"
+                      className="w-full h-11"
+                      size="lg"
+                      loading={signUpMutation.isPending}
+                      disabled={signUpMutation.isPending}
+                    >
+                      Create Account
                     </Button>
+                    {form.formState.errors.root && (
+                      <p className="text-sm text-destructive text-center">
+                        {form.formState.errors.root.message}
+                      </p>
+                    )}
                 </form>
             </Form>
 

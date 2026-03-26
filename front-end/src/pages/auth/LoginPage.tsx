@@ -33,7 +33,15 @@ export default function LoginPage() {
   })
 
   const onSubmit = async (data: LoginValues) => {
-    loginMutation.mutate(data)
+    form.clearErrors("root")
+  
+    loginMutation.mutate(data, {
+      onError: (error: Error) => {
+        form.setError("root", {
+          message: error.message || "Invalid email or password",
+        })
+      },
+    })
   }
 
   const handleGoogleLogin = () => {
@@ -110,9 +118,20 @@ export default function LoginPage() {
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full h-11" size="lg" loading={loginMutation.isPending}>
-                        Sign In
+                    <Button
+                      type="submit"
+                      className="w-full h-11"
+                      size="lg"
+                      loading={loginMutation.isPending}
+                      disabled={loginMutation.isPending}
+                    >
+                      Sign In
                     </Button>
+                    {form.formState.errors.root && (
+                      <p className="text-sm text-destructive text-center">
+                        {form.formState.errors.root.message}
+                      </p>
+                    )}
                 </form>
             </Form>
 

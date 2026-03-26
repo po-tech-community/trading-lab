@@ -1,6 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 /**
  * Mock Authentication Hook
@@ -8,47 +11,119 @@ import { toast } from "sonner";
  */
 
 // Mock credentials for testing
-const MOCK_USER = {
-  email: "admin@tradinglab.com",
-  password: "Password123",
-  firstName: "Trading",
-  lastName: "LabAdmin",
+// const MOCK_USER = {
+//   email: "admin@tradinglab.com",
+//   password: "Password123",
+//   firstName: "Trading",
+//   lastName: "LabAdmin",
+// };
+
+type AuthResponse = {
+  user: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  accessToken: string;
 };
 
+type SessionState = {
+  user: AuthResponse["user"] | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+};
+
+type RefreshResponse = {
+  user: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  accessToken: string;
+};
+
+type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+type SignUpPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
+
+function saveSession(data: RefreshResponse | AuthResponse) {
+  localStorage.setItem("accessToken", data.accessToken);
+  localStorage.setItem("user", JSON.stringify(data.user));
+}
+
+function clearSession() {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("user");
+}
+
+async function refetchSession(): Promise<SessionState> {
+  const accessToken = localStorage.getItem("accessToken");
+  const userJson = localStorage.getItem("user");
+
+  if (accessToken && userJson) {
+    return {
+      user: JSON.parse(userJson),
+      isAuthenticated: true,
+      isLoading: false,
+    };
+  }
+
+  try {
+    const data = await apiClient<RefreshResponse>("/auth/refresh", {
+      method: "POST",
+    });
+
+    saveSession(data);
+
+    return {
+      user: data.user,
+      isAuthenticated: true,
+      isLoading: false,
+    };
+  } catch {
+    clearSession();
+
+    return {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+    };
+  }
+}
 export function useLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const from =
+    (location.state as any)?.from?.pathname || "/home";
 
-  return useMutation({
-    mutationFn: async (data: any) => {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock validation
-      if (data.email === MOCK_USER.email && data.password === MOCK_USER.password) {
-        return {
-          user: {
-            id: "mock-id-123",
-            email: MOCK_USER.email,
-            firstName: MOCK_USER.firstName,
-            lastName: MOCK_USER.lastName,
-          },
-          accessToken: "mock-jwt-token-access",
-          refreshToken: "mock-jwt-token-refresh",
-        };
-      }
-
-      throw new Error("Invalid email or password. Please try again.");
+  return useMutation<AuthResponse, Error, LoginPayload>({
+    mutationFn: async (data: LoginPayload) => {
+      return apiClient<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      });
     },
     onSuccess: (data) => {
-      // Persist mock session
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      
+      saveSession(data);
+
       toast.success("Welcome back!", {
-        description: `Logged in as ${data.user.firstName}`,
+        description: `Logged in as ${data.user.firstName ?? data.user.email}`,
       });
-      
-      navigate("/home");
+
+      navigate(from, { replace: true });
     },
     onError: (error: Error) => {
       toast.error("Authentication Failed", {
@@ -61,35 +136,25 @@ export function useLogin() {
 export function useSignUp() {
   const navigate = useNavigate();
 
-  return useMutation({
-    mutationFn: async (data: any) => {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Mock conflict check
-      if (data.email === MOCK_USER.email) {
-        throw new Error("This email is already registered.");
-      }
-
-      return {
-        user: {
-          id: "mock-new-id-" + Math.random().toString(36).substr(2, 9),
+  return useMutation<AuthResponse, Error, SignUpPayload>({
+    mutationFn: async (data: SignUpPayload) => {
+      return apiClient<AuthResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
           email: data.email,
+          password: data.password,
           firstName: data.firstName,
           lastName: data.lastName,
-        },
-        accessToken: "mock-jwt-token-access-new",
-        refreshToken: "mock-jwt-token-refresh-new",
-      };
+        }),
+      });
     },
     onSuccess: (data) => {
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      
+      saveSession(data);
+
       toast.success("Account created!", {
         description: "Welcome to Trading Lab.",
       });
-      
+
       navigate("/home");
     },
     onError: (error: Error) => {
@@ -104,8 +169,7 @@ export function useLogout() {
   const navigate = useNavigate();
 
   const logout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
+    clearSession();
     toast.info("Logged out successfully");
     navigate("/log-in");
   };
@@ -114,12 +178,35 @@ export function useLogout() {
 }
 
 export function useSession() {
-  const userJson = localStorage.getItem("user");
-  const user = userJson ? JSON.parse(userJson) : null;
-  const isAuthenticated = !!localStorage.getItem("accessToken");
+  const [session, setSession] = useState<SessionState>(() => ({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+  }));
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      const nextSession = await refetchSession();
+      setSession(nextSession);
+    };
+
+    restoreSession();
+  }, []);
+
+  const refetch = async () => {
+    setSession((prev) => ({
+      ...prev,
+      isLoading: true,
+    }));
+
+    const nextSession = await refetchSession();
+    setSession(nextSession);
+
+    return nextSession;
+  };
 
   return {
-    user,
-    isAuthenticated,
+    ...session,
+    refetch,
   };
 }

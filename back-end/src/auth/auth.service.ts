@@ -109,7 +109,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const isValidPassword = await bcrypt.compare(dto.password, user.passwordHash);
+    const isValidPassword = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid email or password');
@@ -150,6 +153,10 @@ export class AuthService {
     const accessToken = this.signAccessToken(newPayload);
     const newRefreshToken = this.signRefreshToken(newPayload);
 
-    return { user: this.toAuthUser(user), accessToken, refreshToken: newRefreshToken };
+    return {
+      user: this.toAuthUser(user),
+      accessToken,
+      refreshToken: newRefreshToken,
+    };
   }
 }

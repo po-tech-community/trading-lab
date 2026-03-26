@@ -37,10 +37,11 @@ export async function apiClient<T>(
       ...defaultHeaders,
       ...options.headers,
     },
+    credentials: 'include',
   };
 
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}${endpoint}`,
+    `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}${endpoint}`,
     config
   );
 
@@ -63,5 +64,11 @@ export async function apiClient<T>(
     return {} as T;
   }
 
-  return response.json() as Promise<T>;
+  const text = await response.text();
+
+  if (!text) {
+    return {} as T;
+  }
+
+  return JSON.parse(text) as T;
 }
