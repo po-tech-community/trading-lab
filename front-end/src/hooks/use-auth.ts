@@ -1,9 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 
 /**
  * Mock Authentication Hook
@@ -56,7 +55,20 @@ type SignUpPayload = {
   password: string;
 };
 
-function saveSession(data: RefreshResponse | AuthResponse) {
+export interface SessionUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string | null;
+}
+
+export interface SessionPayload {
+  user: SessionUser;
+  accessToken: string;
+}
+
+function persistSession(data: SessionPayload | RefreshResponse | AuthResponse) {
   localStorage.setItem("accessToken", data.accessToken);
   localStorage.setItem("user", JSON.stringify(data.user));
 }
@@ -83,7 +95,7 @@ async function refetchSession(): Promise<SessionState> {
       method: "POST",
     });
 
-    saveSession(data);
+    persistSession(data);
 
     return {
       user: data.user,
@@ -100,11 +112,21 @@ async function refetchSession(): Promise<SessionState> {
     };
   }
 }
+
+export function beginGoogleAuth() {
+  const apiBaseUrl =
+    import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+  window.location.href = `${apiBaseUrl}/auth/google?redirect=frontend`;
+}
+
+export function completeSession(data: SessionPayload) {
+  persistSession(data);
+}
+
 export function useLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from =
-    (location.state as any)?.from?.pathname || "/home";
+  const from = (location.state as any)?.from?.pathname || "/home";
 
   return useMutation<AuthResponse, Error, LoginPayload>({
     mutationFn: async (data: LoginPayload) => {
@@ -117,7 +139,7 @@ export function useLogin() {
       });
     },
     onSuccess: (data) => {
-      saveSession(data);
+      persistSession(data);
 
       toast.success("Welcome back!", {
         description: `Logged in as ${data.user.firstName ?? data.user.email}`,
@@ -149,7 +171,7 @@ export function useSignUp() {
       });
     },
     onSuccess: (data) => {
-      saveSession(data);
+      persistSession(data);
 
       toast.success("Account created!", {
         description: "Welcome to Trading Lab.",
@@ -168,10 +190,18 @@ export function useSignUp() {
 export function useLogout() {
   const navigate = useNavigate();
 
-  const logout = () => {
-    clearSession();
-    toast.info("Logged out successfully");
-    navigate("/log-in");
+  const logout = async () => {
+    try {
+      await apiClient("/auth/logout", {
+        method: "POST",
+      });
+    } catch {
+      // Clear local session even if the backend request fails.
+    } finally {
+      clearSession();
+      toast.info("Logged out successfully");
+      navigate("/log-in");
+    }
   };
 
   return { logout };

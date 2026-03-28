@@ -9,7 +9,7 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
     this.data = data;
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -19,30 +19,30 @@ export class ApiError extends Error {
  */
 export async function apiClient<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   };
 
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem("accessToken");
   if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
+    defaultHeaders["Authorization"] = `Bearer ${token}`;
   }
 
   const config: RequestInit = {
     ...options,
+    credentials: options.credentials ?? "include",
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
-    credentials: 'include',
   };
 
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}${endpoint}`,
-    config
+    `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}${endpoint}`,
+    config,
   );
 
   if (!response.ok) {
@@ -54,8 +54,8 @@ export async function apiClient<T>(
     }
     throw new ApiError(
       response.status,
-      errorData.message || 'API Request Failed',
-      errorData
+      errorData.message || "API Request Failed",
+      errorData,
     );
   }
 

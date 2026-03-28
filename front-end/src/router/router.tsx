@@ -3,6 +3,7 @@ import UITestPage from '@/examples/components/UITestPage';
 import MainLayout from '@/layouts/MainLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import SignUpPage from '@/pages/auth/SignUpPage';
+import GoogleAuthCallbackPage from '@/pages/auth/GoogleAuthCallbackPage';
 import ForbiddenPage from '@/pages/error/ForbiddenPage';
 import NotFoundPage from '@/pages/error/NotFoundPage';
 import HomePage from '@/pages/HomePage';
@@ -31,6 +32,11 @@ export const router = createBrowserRouter([
     path: '/sign-up',
     element: <SignUpPage />,
     ...breadcrumb('Sign up'),
+  },
+  {
+    path: '/auth/google/callback',
+    element: <GoogleAuthCallbackPage />,
+    ...breadcrumb('Google Sign-In'),
   },
   {
     path: 'ui-test-page',

@@ -11,16 +11,20 @@
  */
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit/audit.service';
 
 export interface AuthUser {
   id: string;
@@ -30,12 +34,31 @@ export interface AuthUser {
   avatarUrl: string | null;
 }
 
+interface GoogleTokenResponse {
+  access_token: string;
+  expires_in: number;
+  scope: string;
+  token_type: string;
+  id_token?: string;
+}
+
+interface GoogleProfile {
+  sub: string;
+  email: string;
+  email_verified?: boolean;
+  given_name?: string;
+  family_name?: string;
+  name?: string;
+  picture?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly auditService: AuditService,
   ) {}
 
   private signAccessToken(payload: { sub: string; email: string }): string {
@@ -49,6 +72,18 @@ export class AuthService {
       secret: this.configService.getOrThrow<string>('JWT_SECRET'),
       expiresIn: '7d',
     });
+  }
+
+  private issueAuthTokens(user: { id?: string; _id?: unknown; email: string }) {
+    const payload = {
+      sub: user.id ?? String(user._id),
+      email: user.email,
+    };
+
+    return {
+      accessToken: this.signAccessToken(payload),
+      refreshToken: this.signRefreshToken(payload),
+    };
   }
 
   private toAuthUser(user: {
@@ -68,6 +103,117 @@ export class AuthService {
     };
   }
 
+  private getGoogleCallbackUrl(): string {
+    return this.configService.getOrThrow<string>('GOOGLE_CALLBACK_URL');
+  }
+
+  private getFrontendGoogleCallbackUrl(): string {
+    const configuredUrl = this.configService.get<string>(
+      'FRONTEND_GOOGLE_CALLBACK_URL',
+    );
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+
+    const frontendOrigin =
+      this.configService.getOrThrow<string>('FRONTEND_ORIGIN');
+    return `${frontendOrigin.replace(/\/$/, '')}/auth/google/callback`;
+  }
+
+  getGoogleAuthUrl(redirectToFrontend = false): string {
+    const baseUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    const paramsObject: Record<string, string> = {
+      client_id: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+      redirect_uri: this.getGoogleCallbackUrl(),
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'consent',
+    };
+
+    if (redirectToFrontend) {
+      paramsObject.state = this.getFrontendGoogleCallbackUrl();
+    }
+
+    const params = new URLSearchParams(paramsObject);
+
+    return `${baseUrl}?${params.toString()}`;
+  }
+
+  isValidGoogleFrontendState(state: string): boolean {
+    try {
+      const expected = new URL(this.getFrontendGoogleCallbackUrl());
+      const received = new URL(state);
+
+      return (
+        expected.origin === received.origin &&
+        expected.pathname === received.pathname
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async exchangeGoogleCodeForTokens(
+    code: string,
+  ): Promise<GoogleTokenResponse> {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+        client_secret: this.configService.getOrThrow<string>(
+          'GOOGLE_CLIENT_SECRET',
+        ),
+        redirect_uri: this.getGoogleCallbackUrl(),
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException(
+        'Failed to exchange Google authorization code',
+      );
+    }
+
+    return response.json() as Promise<GoogleTokenResponse>;
+  }
+
+  private async fetchGoogleProfile(
+    accessToken: string,
+  ): Promise<GoogleProfile> {
+    const response = await fetch(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Failed to fetch Google profile');
+    }
+
+    return response.json() as Promise<GoogleProfile>;
+  }
+
+  private getNamesFromGoogleProfile(profile: GoogleProfile): {
+    firstName: string;
+    lastName: string;
+  } {
+    const fullName = profile.name?.trim() ?? '';
+    const nameParts = fullName ? fullName.split(/\s+/) : [];
+    const firstName = profile.given_name?.trim() || nameParts[0] || 'Google';
+    const lastName =
+      profile.family_name?.trim() || nameParts.slice(1).join(' ') || 'User';
+
+    return { firstName, lastName };
+  }
+
   async register(
     dto: RegisterDto,
   ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
@@ -85,16 +231,15 @@ export class AuthService {
       passwordHash,
     });
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
+    const { accessToken, refreshToken } = this.issueAuthTokens(user);
+    const authUser = this.toAuthUser(user);
 
-    const accessToken = this.signAccessToken(payload);
-    const refreshToken = this.signRefreshToken(payload);
+    await this.auditService.logAuthEvent('register', authUser.id, {
+      email: authUser.email,
+    });
 
     return {
-      user: this.toAuthUser(user),
+      user: authUser,
       accessToken,
       refreshToken,
     };
@@ -118,16 +263,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
+    const { accessToken, refreshToken } = this.issueAuthTokens(user);
+    const authUser = this.toAuthUser(user);
 
-    const accessToken = this.signAccessToken(payload);
-    const refreshToken = this.signRefreshToken(payload);
+    await this.auditService.logAuthEvent('login', authUser.id, {
+      email: authUser.email,
+    });
 
     return {
-      user: this.toAuthUser(user),
+      user: authUser,
       accessToken,
       refreshToken,
     };
@@ -149,14 +293,100 @@ export class AuthService {
     const user = await this.usersService.findById(payload.sub);
     if (!user) throw new UnauthorizedException('User not found');
 
-    const newPayload = { sub: user.id, email: user.email };
-    const accessToken = this.signAccessToken(newPayload);
-    const newRefreshToken = this.signRefreshToken(newPayload);
+    const { accessToken, refreshToken: newRefreshToken } =
+      this.issueAuthTokens(user);
+    const authUser = this.toAuthUser(user);
+
+    await this.auditService.logAuthEvent('refresh', authUser.id, {
+      email: authUser.email,
+    });
+
+    return { user: authUser, accessToken, refreshToken: newRefreshToken };
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.auditService.logAuthEvent('logout', userId);
+  }
+
+  async loginWithGoogle(
+    code: string,
+  ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
+    if (!code) {
+      throw new BadRequestException('Google authorization code is required');
+    }
+
+    const tokens = await this.exchangeGoogleCodeForTokens(code);
+    const googleProfile = await this.fetchGoogleProfile(tokens.access_token);
+
+    if (!googleProfile.email) {
+      throw new UnauthorizedException('Google account email is required');
+    }
+
+    if (googleProfile.email_verified === false) {
+      throw new UnauthorizedException('Google account email is not verified');
+    }
+
+    let user = await this.usersService.findByGoogleId(googleProfile.sub);
+    let created = false;
+
+    if (!user) {
+      const existingUser = await this.usersService.findByEmail(
+        googleProfile.email,
+      );
+
+      if (existingUser) {
+        user = await this.usersService.linkGoogleAccount(
+          existingUser.id,
+          googleProfile.sub,
+          googleProfile.picture ?? existingUser.avatarUrl ?? null,
+        );
+      } else {
+        const { firstName, lastName } =
+          this.getNamesFromGoogleProfile(googleProfile);
+        const passwordHash = await bcrypt.hash(randomUUID(), 10);
+
+        user = await this.usersService.create({
+          firstName,
+          lastName,
+          email: googleProfile.email,
+          passwordHash,
+          googleId: googleProfile.sub,
+          avatarUrl: googleProfile.picture ?? null,
+        });
+        created = true;
+      }
+    }
+
+    if (!user) {
+      throw new InternalServerErrorException(
+        'Unable to complete Google sign-in',
+      );
+    }
+
+    const authUser = this.toAuthUser(user);
+    const { accessToken, refreshToken } = this.issueAuthTokens(user);
+
+    if (created) {
+      await this.auditService.logAuthEvent('register', authUser.id, {
+        email: authUser.email,
+        provider: 'google',
+      });
+    }
+
+    await this.auditService.logAuthEvent('login', authUser.id, {
+      email: authUser.email,
+      provider: 'google',
+    });
 
     return {
-      user: this.toAuthUser(user),
+      user: authUser,
       accessToken,
-      refreshToken: newRefreshToken,
+      refreshToken,
     };
+  }
+
+  buildGoogleFrontendRedirectUrl(data: { redirectUrl?: string }): string {
+    const baseUrl = data.redirectUrl || this.getFrontendGoogleCallbackUrl();
+    return baseUrl;
   }
 }
