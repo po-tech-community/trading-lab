@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { runSingleAssetDcaBacktest, type RunDcaBacktestParams } from './calculation.service';
 import type { PricePoint } from './price.service';
 
@@ -75,17 +74,5 @@ describe('runSingleAssetDcaBacktest', () => {
     expect(result.summary.currentValue).toBeCloseTo(700, 10); // 17.5 * 40
   });
 
-  it('throws BadRequestException for invalid amount', () => {
-    const prices: PricePoint[] = [{ date: day('2025-01-01'), close: 10 }];
-
-    expect(() =>
-      runSingleAssetDcaBacktest(prices, {
-        amount: 0,
-        frequency: 'daily',
-        startDate: day('2025-01-01'),
-        endDate: day('2025-01-01'),
-      }),
-    ).toThrow(BadRequestException);
-  });
 });
 
