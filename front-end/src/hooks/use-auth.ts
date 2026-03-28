@@ -68,9 +68,7 @@ export interface SessionPayload {
   accessToken: string;
 }
 
-function persistSession(
-  data: SessionPayload | RefreshResponse | AuthResponse,
-) {
+function persistSession(data: SessionPayload | RefreshResponse | AuthResponse) {
   localStorage.setItem("accessToken", data.accessToken);
   localStorage.setItem("user", JSON.stringify(data.user));
 }
@@ -116,7 +114,9 @@ async function refetchSession(): Promise<SessionState> {
 }
 
 export function beginGoogleAuth() {
-  window.location.href = `${import.meta.env.VITE_API_URL}/auth/google?redirect=frontend`;
+  const apiBaseUrl =
+    import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+  window.location.href = `${apiBaseUrl}/auth/google?redirect=frontend`;
 }
 
 export function completeSession(data: SessionPayload) {
@@ -126,8 +126,7 @@ export function completeSession(data: SessionPayload) {
 export function useLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from =
-    (location.state as any)?.from?.pathname || "/home";
+  const from = (location.state as any)?.from?.pathname || "/home";
 
   return useMutation<AuthResponse, Error, LoginPayload>({
     mutationFn: async (data: LoginPayload) => {

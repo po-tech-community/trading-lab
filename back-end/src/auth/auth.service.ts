@@ -108,12 +108,15 @@ export class AuthService {
   }
 
   private getFrontendGoogleCallbackUrl(): string {
-    const configuredUrl = this.configService.get<string>('FRONTEND_GOOGLE_CALLBACK_URL');
+    const configuredUrl = this.configService.get<string>(
+      'FRONTEND_GOOGLE_CALLBACK_URL',
+    );
     if (configuredUrl) {
       return configuredUrl;
     }
 
-    const frontendOrigin = this.configService.getOrThrow<string>('FRONTEND_ORIGIN');
+    const frontendOrigin =
+      this.configService.getOrThrow<string>('FRONTEND_ORIGIN');
     return `${frontendOrigin.replace(/\/$/, '')}/auth/google/callback`;
   }
 
@@ -137,7 +140,23 @@ export class AuthService {
     return `${baseUrl}?${params.toString()}`;
   }
 
-  private async exchangeGoogleCodeForTokens(code: string): Promise<GoogleTokenResponse> {
+  isValidGoogleFrontendState(state: string): boolean {
+    try {
+      const expected = new URL(this.getFrontendGoogleCallbackUrl());
+      const received = new URL(state);
+
+      return (
+        expected.origin === received.origin &&
+        expected.pathname === received.pathname
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async exchangeGoogleCodeForTokens(
+    code: string,
+  ): Promise<GoogleTokenResponse> {
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -146,25 +165,34 @@ export class AuthService {
       body: new URLSearchParams({
         code,
         client_id: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
-        client_secret: this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
+        client_secret: this.configService.getOrThrow<string>(
+          'GOOGLE_CLIENT_SECRET',
+        ),
         redirect_uri: this.getGoogleCallbackUrl(),
         grant_type: 'authorization_code',
       }).toString(),
     });
 
     if (!response.ok) {
-      throw new UnauthorizedException('Failed to exchange Google authorization code');
+      throw new UnauthorizedException(
+        'Failed to exchange Google authorization code',
+      );
     }
 
     return response.json() as Promise<GoogleTokenResponse>;
   }
 
-  private async fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
+  private async fetchGoogleProfile(
+    accessToken: string,
+  ): Promise<GoogleProfile> {
+    const response = await fetch(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       throw new UnauthorizedException('Failed to fetch Google profile');
@@ -265,7 +293,8 @@ export class AuthService {
     const user = await this.usersService.findById(payload.sub);
     if (!user) throw new UnauthorizedException('User not found');
 
-    const { accessToken, refreshToken: newRefreshToken } = this.issueAuthTokens(user);
+    const { accessToken, refreshToken: newRefreshToken } =
+      this.issueAuthTokens(user);
     const authUser = this.toAuthUser(user);
 
     await this.auditService.logAuthEvent('refresh', authUser.id, {
@@ -301,7 +330,9 @@ export class AuthService {
     let created = false;
 
     if (!user) {
-      const existingUser = await this.usersService.findByEmail(googleProfile.email);
+      const existingUser = await this.usersService.findByEmail(
+        googleProfile.email,
+      );
 
       if (existingUser) {
         user = await this.usersService.linkGoogleAccount(
@@ -310,7 +341,8 @@ export class AuthService {
           googleProfile.picture ?? existingUser.avatarUrl ?? null,
         );
       } else {
-        const { firstName, lastName } = this.getNamesFromGoogleProfile(googleProfile);
+        const { firstName, lastName } =
+          this.getNamesFromGoogleProfile(googleProfile);
         const passwordHash = await bcrypt.hash(randomUUID(), 10);
 
         user = await this.usersService.create({
@@ -326,7 +358,9 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new InternalServerErrorException('Unable to complete Google sign-in');
+      throw new InternalServerErrorException(
+        'Unable to complete Google sign-in',
+      );
     }
 
     const authUser = this.toAuthUser(user);
@@ -351,17 +385,8 @@ export class AuthService {
     };
   }
 
-  buildGoogleFrontendRedirectUrl(data: {
-    accessToken: string;
-    user: AuthUser;
-    redirectUrl?: string;
-  }): string {
+  buildGoogleFrontendRedirectUrl(data: { redirectUrl?: string }): string {
     const baseUrl = data.redirectUrl || this.getFrontendGoogleCallbackUrl();
-    const params = new URLSearchParams({
-      accessToken: data.accessToken,
-      user: encodeURIComponent(JSON.stringify(data.user)),
-    });
-
-    return `${baseUrl}?${params.toString()}`;
+    return baseUrl;
   }
 }
