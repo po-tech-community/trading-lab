@@ -233,7 +233,6 @@ export class AuthService {
 
     const { accessToken, refreshToken } = this.issueAuthTokens(user);
     const authUser = this.toAuthUser(user);
-
     await this.auditService.logAuthEvent('register', authUser.id, {
       email: authUser.email,
     });
@@ -265,7 +264,6 @@ export class AuthService {
 
     const { accessToken, refreshToken } = this.issueAuthTokens(user);
     const authUser = this.toAuthUser(user);
-
     await this.auditService.logAuthEvent('login', authUser.id, {
       email: authUser.email,
     });

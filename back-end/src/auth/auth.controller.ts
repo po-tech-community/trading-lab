@@ -149,7 +149,6 @@ export class AuthController {
       accessToken: result.accessToken,
     };
   }
-
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
