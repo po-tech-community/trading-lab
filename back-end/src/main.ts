@@ -24,8 +24,29 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   app.use(cookieParser());
 
+  const normalizeOrigin = (value: string): string => value.replace(/\/$/, '');
+  const configuredOrigin = normalizeOrigin(
+    config.get<string>('FRONTEND_ORIGIN', 'http://localhost:3000'),
+  );
+
   app.enableCors({
-    origin: config.get<string>('FRONTEND_ORIGIN'),
+    origin: (requestOrigin, callback) => {
+      // Allow non-browser requests (no Origin header), then enforce exact normalized origin match.
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      if (normalizeOrigin(requestOrigin) === configuredOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(
+        new Error(`Origin ${requestOrigin} is not allowed by CORS`),
+        false,
+      );
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
@@ -42,7 +63,9 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Trading Lab API')
-    .setDescription('DCA Simulator & AI Advisor – backtest, portfolio, triggers, AI.')
+    .setDescription(
+      'DCA Simulator & AI Advisor – backtest, portfolio, triggers, AI.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
