@@ -1,7 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNumber, IsPositive } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsNumber, IsPositive, IsString, Validate } from 'class-validator';
+import { SUPPORTED_BACKTEST_SYMBOLS } from '../supported-symbols';
 import { DCA_FREQUENCIES, type DcaFrequency } from './dca-frequency';
+import { IsEndAfterStartConstraint } from './is-end-after-start.constraint';
 
 /** Plain input shape for the calculation engine (validated via {@link RunDcaBacktestDto} at the HTTP boundary). */
 export interface RunDcaBacktestParams {
@@ -12,6 +14,18 @@ export interface RunDcaBacktestParams {
 }
 
 export class RunDcaBacktestDto implements RunDcaBacktestParams {
+  @ApiProperty({
+    example: 'BTC',
+    enum: SUPPORTED_BACKTEST_SYMBOLS,
+    description: 'Ticker symbol (must be supported by the price service)',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
+  @IsString()
+  @IsIn([...SUPPORTED_BACKTEST_SYMBOLS], {
+    message: `symbol must be one of: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
+  })
+  symbol: string;
+
   @ApiProperty({ example: 100, description: 'Fixed amount per purchase (must be > 0)' })
   @Type(() => Number)
   @IsNumber()
@@ -40,5 +54,6 @@ export class RunDcaBacktestDto implements RunDcaBacktestParams {
   @Type(() => Number)
   @IsNumber()
   @IsInt()
+  @Validate(IsEndAfterStartConstraint)
   endDate: number;
 }

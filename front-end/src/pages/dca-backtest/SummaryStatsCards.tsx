@@ -1,24 +1,42 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Wallet, TrendingUp, ArrowUpRight, DollarSign, Zap } from "lucide-react"
+import type { BacktestSummary } from "@/lib/backtest-api"
 
-/**
- * Mock summary stats for the current backtest run.
- * Replace with real computed values when backend/engine is connected.
- */
-const MOCK_STATS = {
-  invested: { value: "$1,200.00", installments: 12 },
-  portfolioValue: { value: "$2,150.42", changePercent: "+79.2%" },
-  roi: { value: "+$950.42", label: "Total profit generated" },
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+const pct = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
+function formatSignedCurrency(value: number): string {
+  const abs = currency.format(Math.abs(value))
+  return value >= 0 ? `+${abs}` : `-${currency.format(Math.abs(value))}`
+}
+
+export interface SummaryStatsCardsProps {
+  summary: BacktestSummary | null
 }
 
 /**
  * Three summary cards: Total invested, Portfolio value, ROI.
- * Used below the strategy config and above the chart.
  */
-export function SummaryStatsCards() {
+export function SummaryStatsCards({ summary }: SummaryStatsCardsProps) {
+  const invested = summary?.totalInvested ?? null
+  const portfolioValue = summary?.currentValue ?? null
+  const roiPct = summary?.totalReturnPercentage ?? null
+  const installments = summary?.numberOfPurchases ?? null
+  const profit =
+    invested !== null && portfolioValue !== null ? portfolioValue - invested : null
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Total invested */}
       <Card className="relative h-full overflow-hidden border bg-card p-0">
         <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
           <div className="flex items-center gap-3">
@@ -34,11 +52,11 @@ export function SummaryStatsCards() {
           </div>
           <div className="space-y-2">
             <div className="text-2xl font-semibold tabular-nums">
-              {MOCK_STATS.invested.value}
+              {invested !== null ? currency.format(invested) : "—"}
             </div>
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <div className="size-1.5 rounded-full bg-primary/30" />
-              {MOCK_STATS.invested.installments} installments
+              {installments !== null ? `${installments} installments` : "—"}
             </div>
           </div>
           <div className="absolute -bottom-6 -right-6 p-6 opacity-10">
@@ -47,7 +65,6 @@ export function SummaryStatsCards() {
         </CardContent>
       </Card>
 
-      {/* Portfolio value */}
       <Card className="relative h-full overflow-hidden border bg-card p-0">
         <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
           <div className="flex items-center gap-3">
@@ -63,13 +80,17 @@ export function SummaryStatsCards() {
           </div>
           <div className="space-y-2">
             <div className="text-2xl font-semibold tabular-nums text-emerald-500">
-              {MOCK_STATS.portfolioValue.value}
+              {portfolioValue !== null ? currency.format(portfolioValue) : "—"}
             </div>
             <div className="flex items-center gap-2">
-              <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs flex items-center gap-1 border border-emerald-500/20">
-                <ArrowUpRight className="h-3 w-3" />
-                {MOCK_STATS.portfolioValue.changePercent}
-              </div>
+              {roiPct !== null ? (
+                <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs flex items-center gap-1 border border-emerald-500/20">
+                  <ArrowUpRight className="h-3 w-3" />
+                  {pct.format(roiPct / 100)}
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
             </div>
           </div>
           <div className="absolute -bottom-6 -right-6 p-6 opacity-10 text-emerald-500">
@@ -78,7 +99,6 @@ export function SummaryStatsCards() {
         </CardContent>
       </Card>
 
-      {/* ROI */}
       <Card className="relative h-full overflow-hidden border bg-card p-0">
         <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
           <div className="flex items-center gap-3">
@@ -94,10 +114,10 @@ export function SummaryStatsCards() {
           </div>
           <div className="space-y-2">
             <div className="text-2xl font-semibold tabular-nums text-orange-500">
-              {MOCK_STATS.roi.value}
+              {profit !== null ? formatSignedCurrency(profit) : "—"}
             </div>
             <div className="text-xs text-muted-foreground">
-              {MOCK_STATS.roi.label}
+              {profit !== null ? "Total profit generated" : "Run a backtest to see results"}
             </div>
           </div>
           <div className="absolute -bottom-6 -right-6 p-6 opacity-10 text-orange-500">

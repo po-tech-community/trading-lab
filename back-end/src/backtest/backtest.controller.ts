@@ -1,7 +1,9 @@
+
 import { BadRequestException, Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CalculationService } from './calculation.service';
+import { RunDcaBacktestDto } from './dto/run-dca-backtest.dto';
 import { RunPortfolioDcaBacktestDto } from './dto/run-portfolio-backtest.dto';
-import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PriceService } from './price.service';
 import { Public } from '../common/decorators/public.decorator';
 
@@ -13,6 +15,22 @@ export class BacktestController {
         private readonly priceService: PriceService,
         private readonly calculationService: CalculationService,
     ) { }
+
+
+    @ApiOperation({ summary: 'Run DCA backtest for single asset' })
+    @Post('run')
+    @ApiBody({ type: RunDcaBacktestDto })
+    async run(@Body() body: RunDcaBacktestDto) {
+        const { symbol, amount, frequency, startDate, endDate } = body;
+        const prices = await this.priceService.fetchPrices(symbol, startDate, endDate);
+        return this.calculationService.runSingleAssetDcaBacktest(prices, {
+            amount,
+            frequency,
+            startDate,
+            endDate,
+        });
+    }
+
 
     @Get('test-prices')
     @ApiOperation({

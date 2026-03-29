@@ -21,6 +21,8 @@ export interface PortfolioTrajectoryChartProps {
   isFullscreen: boolean
   /** Toggle fullscreen */
   onFullscreenChange: () => void
+  /** Subtitle under the chart title (e.g. date range) */
+  chartDescription?: string
 }
 
 /**
@@ -31,6 +33,7 @@ export function PortfolioTrajectoryChart({
   data,
   isFullscreen,
   onFullscreenChange,
+  chartDescription = "Performance visualization",
 }: PortfolioTrajectoryChartProps) {
   return (
     <Card
@@ -42,7 +45,7 @@ export function PortfolioTrajectoryChart({
       <CardHeader className="flex flex-row items-center justify-between border-b border-border">
         <div>
           <CardTitle className="text-lg font-semibold">Portfolio trajectory</CardTitle>
-          <CardDescription>Performance visualization (Jan - Dec 2023)</CardDescription>
+          <CardDescription>{chartDescription}</CardDescription>
         </div>
         <div className="flex items-center gap-4">
           {/* Legend: equity vs basis */}

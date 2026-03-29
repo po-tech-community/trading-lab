@@ -7,6 +7,7 @@ describe('RunDcaBacktestDto', () => {
 
   it('passes for valid payload', async () => {
     const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
       amount: 100,
       frequency: 'daily',
       startDate: day('2025-01-01'),
@@ -18,10 +19,11 @@ describe('RunDcaBacktestDto', () => {
 
   it('rejects non-positive amount', async () => {
     const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
       amount: 0,
       frequency: 'daily',
       startDate: day('2025-01-01'),
-      endDate: day('2025-01-01'),
+      endDate: day('2025-01-02'),
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
@@ -30,12 +32,37 @@ describe('RunDcaBacktestDto', () => {
 
   it('rejects invalid frequency', async () => {
     const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
       amount: 100,
       frequency: 'hourly',
       startDate: day('2025-01-01'),
-      endDate: day('2025-01-01'),
+      endDate: day('2025-01-02'),
     });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'frequency')).toBe(true);
+  });
+
+  it('rejects unsupported symbol', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'DOGE',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-02'),
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'symbol')).toBe(true);
+  });
+
+  it('rejects endDate before or equal to startDate', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-03'),
+      endDate: day('2025-01-01'),
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'endDate')).toBe(true);
   });
 });
