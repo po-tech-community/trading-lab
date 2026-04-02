@@ -65,6 +65,32 @@ export class PriceService {
         );
     }
 
+    /**
+     * Fetches historical prices for multiple symbols in parallel (one provider call per symbol).
+     * Keys in the returned map are uppercase symbols (e.g. BTC, ETH).
+     *
+     * @see doc/developer-tasks.md L2-BE-1
+     */
+    async fetchPricesForSymbols(
+        symbols: string[],
+        startDate: number,
+        endDate: number,
+    ): Promise<Record<string, PricePoint[]>> {
+        if (!Array.isArray(symbols) || symbols.length === 0) {
+            throw new BadRequestException('At least one symbol is required.');
+        }
+
+        const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
+        const entries = await Promise.all(
+            unique.map(async (symbol) => {
+                const series = await this.fetchPrices(symbol, startDate, endDate);
+                return [symbol, series] as const;
+            }),
+        );
+
+        return Object.fromEntries(entries);
+    }
+
     // ---------------------------------------------------------------------------
     // CoinGecko – crypto prices
     // ---------------------------------------------------------------------------
