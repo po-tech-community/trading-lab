@@ -29,6 +29,10 @@ async function bootstrap() {
     config.get<string>('FRONTEND_ORIGIN', 'http://localhost:3000'),
   );
 
+  const port = config.get('PORT', 8000);
+  // Swagger UI sends requests from the same host as the server, so we must allow it explicitly.
+  const swaggerOrigin = `http://localhost:${port}`;
+
   app.enableCors({
     origin: (requestOrigin, callback) => {
       // Allow non-browser requests (no Origin header), then enforce exact normalized origin match.
@@ -37,7 +41,8 @@ async function bootstrap() {
         return;
       }
 
-      if (normalizeOrigin(requestOrigin) === configuredOrigin) {
+      const allowed = [configuredOrigin, swaggerOrigin];
+      if (allowed.includes(normalizeOrigin(requestOrigin))) {
         callback(null, true);
         return;
       }
@@ -72,7 +77,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = config.get('PORT', 8000);
+
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api/v1`);
   console.log(`Swagger docs: http://localhost:${port}/api/docs`);
