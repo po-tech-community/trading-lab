@@ -1,13 +1,26 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  getCryptoMinUtcIsoDate,
+  getTodayUtcIsoDate,
+} from "./backtest-form-schema";
 
 /** Preset labels only; buttons are non-functional until wired to form state */
+const today = getTodayUtcIsoDate();
+const cryptoMin = getCryptoMinUtcIsoDate();
+
 const PRESETS = [
-  "BTC · $100 weekly · 1 year",
-  "ETH · $50 weekly · 2 years",
-  "AAPL · $200 monthly · 3 years",
-  "TSLA · $100 bi-weekly · 18 months",
-]
+  `BTC · $100 weekly · ${cryptoMin} -> ${today}`,
+  `ETH · $50 weekly · ${cryptoMin} -> ${today}`,
+  `AAPL · $200 monthly · ${cryptoMin} -> ${today}`,
+  `TSLA · $100 weekly · ${cryptoMin} -> ${today}`,
+];
 
 /**
  * Card with quick-preset buttons for common DCA configs.
@@ -17,9 +30,9 @@ export function StrategyPresetsCard() {
   return (
     <Card className="py-6">
       <CardHeader>
-        <CardTitle className="text-base">Strategy presets (mock)</CardTitle>
+        <CardTitle className="text-base">Strategy presets</CardTitle>
         <CardDescription>
-          Quickly try a few common DCA configurations. These buttons do not change inputs yet.
+          Quick DCA ideas with a fixed time window (from one year ago to today).
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2 text-sm">
@@ -30,5 +43,5 @@ export function StrategyPresetsCard() {
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }
