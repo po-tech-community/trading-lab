@@ -1,22 +1,23 @@
-import { ForwardedRef, forwardRef } from "react"
-import { Bot, User, Send } from "lucide-react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
+import { forwardRef } from "react";
+import type { ForwardedRef, KeyboardEvent } from "react";
+import { Bot, User, Send } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export interface ChatMessage {
-  id: string
-  text: string
-  sender: "user" | "ai"
-  timestamp: Date
+  id: string;
+  text: string;
+  sender: "user" | "ai";
+  timestamp: Date;
 }
 
 interface ChatPanelProps {
-  messages: ChatMessage[]
-  input: string
-  onInputChange: (value: string) => void
-  onSend: () => void
+  messages: ChatMessage[];
+  input: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
 }
 
 /**
@@ -26,13 +27,16 @@ interface ChatPanelProps {
  * - Single-line text input with send button.
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-  ({ messages, input, onInputChange, onSend }, scrollRef: ForwardedRef<HTMLDivElement>) => {
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  (
+    { messages, input, onInputChange, onSend },
+    scrollRef: ForwardedRef<HTMLDivElement>,
+  ) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
-        e.preventDefault()
-        onSend()
+        e.preventDefault();
+        onSend();
       }
-    }
+    };
 
     return (
       <Card className="flex-1 flex flex-col overflow-hidden relative gap-0 py-0">
@@ -43,7 +47,9 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
               <Bot className="size-8" />
             </div>
             <div>
-              <h3 className="text-base font-semibold tracking-tight">AI advisor</h3>
+              <h3 className="text-base font-semibold tracking-tight">
+                AI advisor
+              </h3>
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-emerald-500" />
                 <span className="text-xs text-emerald-600">Active</span>
@@ -62,7 +68,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
               key={msg.id}
               className={cn(
                 "flex items-start gap-3 max-w-[70%]",
-                msg.sender === "user" ? "ml-auto flex-row-reverse" : ""
+                msg.sender === "user" ? "ml-auto flex-row-reverse" : "",
               )}
             >
               <div
@@ -70,7 +76,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                   "size-8 rounded-full flex items-center justify-center shrink-0 border",
                   msg.sender === "ai"
                     ? "bg-primary/10 text-primary border-primary/20"
-                    : "bg-muted text-muted-foreground"
+                    : "bg-muted text-muted-foreground",
                 )}
               >
                 {msg.sender === "ai" ? (
@@ -84,7 +90,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                   "p-4 rounded-2xl text-sm leading-relaxed",
                   msg.sender === "ai"
                     ? "bg-card border text-foreground"
-                    : "bg-primary text-primary-foreground"
+                    : "bg-primary text-primary-foreground",
                 )}
               >
                 {msg.text}
@@ -117,9 +123,8 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
           </p>
         </div>
       </Card>
-    )
-  }
-)
+    );
+  },
+);
 
-ChatPanel.displayName = "ChatPanel"
-
+ChatPanel.displayName = "ChatPanel";

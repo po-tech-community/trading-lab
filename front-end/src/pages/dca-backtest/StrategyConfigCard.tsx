@@ -1,13 +1,20 @@
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Settings2, ChevronLeft, ChevronRight, DollarSign, HelpCircle, Target } from "lucide-react"
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Settings2,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  HelpCircle,
+  Target,
+} from "lucide-react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -15,36 +22,41 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { useForm } from "react-hook-form"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import {
   backtestFormSchema,
+  getCryptoMinUtcIsoDate,
+  getTodayUtcIsoDate,
   type BacktestFormValues,
   backtestFormValuesToRequest,
-} from "./backtest-form-schema"
-import type { RunBacktestRequestBody } from "@/lib/backtest-api"
+} from "./backtest-form-schema";
+import type { RunBacktestRequestBody } from "@/lib/backtest-api";
+import { toast } from "sonner";
 
 export interface StrategyConfigCardProps {
   /** Called with validated payload (epoch ms dates). */
-  onSubmit: (body: RunBacktestRequestBody) => void
-  isSubmitting?: boolean
-  submitError?: string | null
-  isCollapsed: boolean
-  onCollapsedChange: (value: boolean) => void
+  onSubmit: (body: RunBacktestRequestBody) => void;
+  onSymbolChange?: (symbol: BacktestFormValues["symbol"]) => void;
+  isSubmitting?: boolean;
+  submitError?: string | null;
+  isCollapsed: boolean;
+  onCollapsedChange: (value: boolean) => void;
 }
 
 /**
@@ -53,31 +65,54 @@ export interface StrategyConfigCardProps {
  */
 export function StrategyConfigCard({
   onSubmit,
+  onSymbolChange,
   isSubmitting = false,
   submitError,
   isCollapsed,
   onCollapsedChange,
 }: StrategyConfigCardProps) {
+  const todayIso = getTodayUtcIsoDate();
+  const oneYearAgoIso = getCryptoMinUtcIsoDate();
+  const defaultStart = oneYearAgoIso > "" ? oneYearAgoIso : "2023-01-01";
+  const defaultEnd = todayIso;
+
   const form = useForm<BacktestFormValues>({
     resolver: zodResolver(backtestFormSchema),
     defaultValues: {
       symbol: "BTC",
       amount: 100,
       frequency: "weekly",
-      startDate: "2023-01-01",
-      endDate: "2023-12-31",
+      startDate: defaultStart,
+      endDate: defaultEnd,
     },
-  })
+  });
 
-  const handleSubmit = form.handleSubmit((values) => {
-    onSubmit(backtestFormValuesToRequest(values))
-  })
+  const selectedSymbol = form.watch("symbol");
+
+  useEffect(() => {
+    onSymbolChange?.(selectedSymbol);
+  }, [onSymbolChange, selectedSymbol]);
+
+  const handleSubmit = form.handleSubmit(
+    (values) => {
+      onSubmit(backtestFormValuesToRequest(values));
+    },
+    () => {
+      const startError = form.formState.errors.startDate?.message;
+      const endError = form.formState.errors.endDate?.message;
+      if (startError || endError) {
+        toast.warning("Please adjust the date range before submitting.");
+      }
+    },
+  );
 
   return (
     <Card
       className={cn(
         "relative overflow-hidden shrink-0 py-6",
-        isCollapsed ? "w-16 h-12 overflow-hidden" : "w-full lg:col-span-4 lg:w-[360px]"
+        isCollapsed
+          ? "w-16 h-12 overflow-hidden"
+          : "w-full lg:col-span-4 lg:w-[360px]",
       )}
     >
       <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
@@ -90,7 +125,11 @@ export function StrategyConfigCard({
             <div className="p-2 rounded-lg bg-muted text-muted-foreground">
               <Settings2 className="size-5" />
             </div>
-            <Button variant="ghost" size="icon" onClick={() => onCollapsedChange(true)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onCollapsedChange(true)}
+            >
               <ChevronLeft className="size-4" />
             </Button>
           </div>
@@ -100,49 +139,76 @@ export function StrategyConfigCard({
 
         {isCollapsed && (
           <div className="flex items-center justify-center h-full w-full">
-            <Button variant="ghost" size="icon" onClick={() => onCollapsedChange(false)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onCollapsedChange(false)}
+            >
               <ChevronRight className="size-4" />
             </Button>
           </div>
         )}
 
-        <CardContent className={cn("space-y-4 relative pt-0", isCollapsed && "hidden")}>
+        <CardContent
+          className={cn("space-y-4 relative pt-0", isCollapsed && "hidden")}
+        >
           <Form {...form}>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <fieldset disabled={isSubmitting} className="space-y-4">
+              <fieldset disabled={isSubmitting} className="space-y-2">
                 <FormField
                   control={form.control}
                   name="symbol"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <FormLabel className="text-xs text-muted-foreground">Select asset</FormLabel>
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Select asset
+                        </FormLabel>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-[200px]">
-                            The cryptocurrency or stock you want to simulate buying periodically.
+                          <TooltipContent
+                            side="right"
+                            className="max-w-[200px]"
+                          >
+                            The cryptocurrency or stock you want to simulate
+                            buying periodically.
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger className="h-10 bg-background/30 border-primary/10 hover:border-primary/30 transition-colors rounded-md font-medium">
                             <SelectValue placeholder="Select asset" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="rounded-xl border-primary/10">
-                          <SelectItem value="BTC" className="focus:bg-primary/10 focus:text-primary">
+                          <SelectItem
+                            value="BTC"
+                            className="focus:bg-primary/10 focus:text-primary"
+                          >
                             Bitcoin (BTC)
                           </SelectItem>
-                          <SelectItem value="ETH" className="focus:bg-primary/10 focus:text-primary">
+                          <SelectItem
+                            value="ETH"
+                            className="focus:bg-primary/10 focus:text-primary"
+                          >
                             Ethereum (ETH)
                           </SelectItem>
-                          <SelectItem value="AAPL" className="focus:bg-primary/10 focus:text-primary">
+                          <SelectItem
+                            value="AAPL"
+                            className="focus:bg-primary/10 focus:text-primary"
+                          >
                             Apple (AAPL)
                           </SelectItem>
-                          <SelectItem value="TSLA" className="focus:bg-primary/10 focus:text-primary">
+                          <SelectItem
+                            value="TSLA"
+                            className="focus:bg-primary/10 focus:text-primary"
+                          >
                             Tesla (TSLA)
                           </SelectItem>
                         </SelectContent>
@@ -156,15 +222,21 @@ export function StrategyConfigCard({
                   control={form.control}
                   name="amount"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <FormLabel className="text-xs text-muted-foreground">Investment amount</FormLabel>
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Investment amount
+                        </FormLabel>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-[200px]">
-                            The fixed amount of USD you will invest in each period (e.g. $100 every week).
+                          <TooltipContent
+                            side="right"
+                            className="max-w-[200px]"
+                          >
+                            The fixed amount of USD you will invest in each
+                            period (e.g. $100 every week).
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -182,10 +254,12 @@ export function StrategyConfigCard({
                             name={field.name}
                             ref={field.ref}
                             onBlur={field.onBlur}
-                            value={Number.isFinite(field.value) ? field.value : ""}
+                            value={
+                              Number.isFinite(field.value) ? field.value : ""
+                            }
                             onChange={(e) => {
-                              const n = e.target.valueAsNumber
-                              field.onChange(Number.isNaN(n) ? 0 : n)
+                              const n = e.target.valueAsNumber;
+                              field.onChange(Number.isNaN(n) ? 0 : n);
                             }}
                           />
                         </FormControl>
@@ -202,19 +276,28 @@ export function StrategyConfigCard({
                   control={form.control}
                   name="frequency"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
+                    <FormItem className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <FormLabel className="text-xs text-muted-foreground">Repeat frequency</FormLabel>
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Repeat frequency
+                        </FormLabel>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-[200px]">
-                            How often you want to make a purchase. More frequent buying reduces timing risk.
+                          <TooltipContent
+                            side="right"
+                            className="max-w-[200px]"
+                          >
+                            How often you want to make a purchase. More frequent
+                            buying reduces timing risk.
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger className="h-10 bg-background/30 border-primary/10 hover:border-primary/30 transition-colors rounded-md font-medium">
                             <SelectValue placeholder="Select frequency" />
@@ -236,10 +319,17 @@ export function StrategyConfigCard({
                     control={form.control}
                     name="startDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel className="text-xs text-muted-foreground">From</FormLabel>
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-xs text-muted-foreground">
+                          From
+                        </FormLabel>
                         <FormControl>
-                          <Input type="date" className="h-10 text-sm" {...field} />
+                          <Input
+                            type="date"
+                            className="h-10 text-sm"
+                            max={todayIso}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -249,10 +339,17 @@ export function StrategyConfigCard({
                     control={form.control}
                     name="endDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel className="text-xs text-muted-foreground">To</FormLabel>
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-xs text-muted-foreground">
+                          To
+                        </FormLabel>
                         <FormControl>
-                          <Input type="date" className="h-10 text-sm" {...field} />
+                          <Input
+                            type="date"
+                            className="h-10 text-sm"
+                            max={todayIso}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -260,13 +357,24 @@ export function StrategyConfigCard({
                   />
                 </div>
 
+                <p className="text-xs text-amber-600" role="note">
+                  Default range is set to From = 1 year ago and To = today. You
+                  can change it, but the selected range must stay within 365
+                  days.
+                </p>
+
                 {submitError ? (
                   <p className="text-sm text-destructive" role="alert">
                     {submitError}
                   </p>
                 ) : null}
 
-                <Button type="submit" className="w-full" variant="default" loading={isSubmitting}>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  variant="default"
+                  loading={isSubmitting}
+                >
                   Calculate returns
                 </Button>
               </fieldset>
@@ -277,5 +385,5 @@ export function StrategyConfigCard({
 
       <div className="absolute bottom-0 left-0 w-full h-px bg-border" />
     </Card>
-  )
+  );
 }

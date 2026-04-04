@@ -12,100 +12,100 @@
  */
 
 import {
-    BadRequestException,
-    Injectable,
-    InternalServerErrorException,
-    Logger,
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-    dateStringToEpochMs,
-    epochMsToDateString,
+  dateStringToEpochMs,
+  epochMsToDateString,
 } from '../common/helpers/date.helper';
 import { SUPPORTED_BACKTEST_SYMBOLS } from './supported-symbols';
 
 export interface PricePoint {
-    date: number; // epoch milliseconds e.g. 1735689600000
-    close: number;
+  date: number; // epoch milliseconds e.g. 1735689600000
+  close: number;
 }
 
 // Which symbols each provider supports
 const COINGECKO_SYMBOLS: Record<string, string> = {
-    BTC: 'bitcoin',
-    ETH: 'ethereum',
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
 };
 
 const ALPHAVANTAGE_SYMBOLS = ['AAPL', 'TSLA'];
 
 @Injectable()
 export class PriceService {
-    private readonly logger = new Logger(PriceService.name);
+  private readonly logger = new Logger(PriceService.name);
 
-    constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
-    /**
-     * Main entry point. Routes to the correct provider based on symbol.
-     */
-    async fetchPrices(
-        symbol: string,
-        startDate: number,
-        endDate: number,
-    ): Promise<PricePoint[]> {
-        const upper = symbol.toUpperCase();
+  /**
+   * Main entry point. Routes to the correct provider based on symbol.
+   */
+  async fetchPrices(
+    symbol: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<PricePoint[]> {
+    const upper = symbol.toUpperCase();
 
-        if (
-            !SUPPORTED_BACKTEST_SYMBOLS.includes(
-                upper as (typeof SUPPORTED_BACKTEST_SYMBOLS)[number],
-            )
-        ) {
-            throw new BadRequestException(
-                `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
-            );
-        }
-
-        if (COINGECKO_SYMBOLS[upper]) {
-            return this.fetchFromCoinGecko(upper, startDate, endDate);
-        }
-
-        if (ALPHAVANTAGE_SYMBOLS.includes(upper)) {
-            return this.fetchFromAlphaVantage(upper, startDate, endDate);
-        }
-
-        throw new BadRequestException(
-            `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
-        );
+    if (
+      !SUPPORTED_BACKTEST_SYMBOLS.includes(
+        upper as (typeof SUPPORTED_BACKTEST_SYMBOLS)[number],
+      )
+    ) {
+      throw new BadRequestException(
+        `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
+      );
     }
 
-    /**
-     * Fetches historical prices for multiple symbols in parallel (one provider call per symbol).
-     * Keys in the returned map are uppercase symbols (e.g. BTC, ETH).
-     *
-     * @see doc/developer-tasks.md L2-BE-1
-     */
-    async fetchPricesForSymbols(
-        symbols: string[],
-        startDate: number,
-        endDate: number,
-    ): Promise<Record<string, PricePoint[]>> {
-        if (!Array.isArray(symbols) || symbols.length === 0) {
-            throw new BadRequestException('At least one symbol is required.');
-        }
-
-        const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
-        const entries = await Promise.all(
-            unique.map(async (symbol) => {
-                const series = await this.fetchPrices(symbol, startDate, endDate);
-                return [symbol, series] as const;
-            }),
-        );
-
-        return Object.fromEntries(entries);
+    if (COINGECKO_SYMBOLS[upper]) {
+      return this.fetchFromCoinGecko(upper, startDate, endDate);
     }
 
-    // ---------------------------------------------------------------------------
-    // CoinGecko – crypto prices
-    // ---------------------------------------------------------------------------
-    /**
+    if (ALPHAVANTAGE_SYMBOLS.includes(upper)) {
+      return this.fetchFromAlphaVantage(upper, startDate, endDate);
+    }
+
+    throw new BadRequestException(
+      `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
+    );
+  }
+
+  /**
+   * Fetches historical prices for multiple symbols in parallel (one provider call per symbol).
+   * Keys in the returned map are uppercase symbols (e.g. BTC, ETH).
+   *
+   * @see doc/developer-tasks.md L2-BE-1
+   */
+  async fetchPricesForSymbols(
+    symbols: string[],
+    startDate: number,
+    endDate: number,
+  ): Promise<Record<string, PricePoint[]>> {
+    if (!Array.isArray(symbols) || symbols.length === 0) {
+      throw new BadRequestException('At least one symbol is required.');
+    }
+
+    const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
+    const entries = await Promise.all(
+      unique.map(async (symbol) => {
+        const series = await this.fetchPrices(symbol, startDate, endDate);
+        return [symbol, series] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries);
+  }
+
+  // ---------------------------------------------------------------------------
+  // CoinGecko – crypto prices
+  // ---------------------------------------------------------------------------
+  /**
    * Fetches historical prices from CoinGecko API.
    *
    * Flow:
@@ -118,83 +118,112 @@ export class PriceService {
    * 7. Return array of { date: epoch_ms, close }
    */
 
-    private async fetchFromCoinGecko(
-        symbol: string,
-        startDate: number,
-        endDate: number,
-    ): Promise<PricePoint[]> {
-        const coinId = COINGECKO_SYMBOLS[symbol];
+  private async fetchFromCoinGecko(
+    symbol: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<PricePoint[]> {
+    const coinId = COINGECKO_SYMBOLS[symbol];
 
-        // CoinGecko uses Unix timestamps (seconds)
-        const from = Math.floor(startDate / 1000);
-        const to = Math.floor(endDate / 1000);
+    // CoinGecko uses Unix timestamps (seconds)
+    const from = Math.floor(startDate / 1000);
+    const to = Math.floor(endDate / 1000);
 
-        const apiKey = this.configService.get<string>('COINGECKO_API_KEY');
-        const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+    const apiKey = this.configService.get<string>('COINGECKO_API_KEY')?.trim();
+    const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
 
-        this.logger.log(`Fetching CoinGecko prices for ${symbol} from ${startDate} to ${endDate}`);
+    this.logger.log(
+      `Fetching CoinGecko prices for ${symbol} from ${startDate} to ${endDate}`,
+    );
 
-        let data: any;
-        try {
-            const res = await fetch(url, {
-                headers: {
-                    'x-cg-demo-api-key': apiKey ?? '',
-                },
-            });
+    let data: any;
+    try {
+      const headers: Record<string, string> = {};
+      // Only send API key header when a non-empty key is configured.
+      // Sending an empty key can trigger 401 on CoinGecko.
+      if (apiKey) {
+        headers['x-cg-demo-api-key'] = apiKey;
+      }
 
-            // CoinGecko returns 429 when rate limited
-            if (res.status === 429) {
-                throw new InternalServerErrorException(
-                    'CoinGecko rate limit reached. Please wait a moment and try again.',
-                );
-            }
+      const res = await fetch(url, {
+        headers,
+      });
 
-            if (!res.ok) {
-                throw new InternalServerErrorException(
-                    `CoinGecko API error: ${res.status} ${res.statusText}`,
-                );
-            }
+      if (res.status === 401) {
+        // CoinGecko can return 401 for both auth issues and free-tier range limits.
+        const rawBody = await res.text();
+        const normalized = rawBody.toLowerCase();
 
-            data = await res.json();
-        } catch (err) {
-            if (
-                err instanceof InternalServerErrorException ||
-                err instanceof BadRequestException
-            ) {
-                throw err;
-            }
-            throw new InternalServerErrorException(
-                'Failed to reach CoinGecko API. Please try again later.',
-            );
+        if (
+          normalized.includes('allowed time range') ||
+          normalized.includes('past 365') ||
+          normalized.includes('historical data within the past')
+        ) {
+          throw new BadRequestException(
+            'CoinGecko free tier only supports historical data in the recent allowed window (about the past 365 days). Please choose a newer date range.',
+          );
         }
 
-        // CoinGecko returns prices as [[timestamp_ms, price], ...]
-        // One data point per day when range > 90 days
-        if (!data.prices || data.prices.length === 0) {
-            throw new BadRequestException(
-                `No price data found for ${symbol} in the given date range.`,
-            );
-        }
+        throw new InternalServerErrorException(
+          apiKey
+            ? 'CoinGecko API key is invalid or expired. Check COINGECKO_API_KEY in your .env file.'
+            : 'CoinGecko rejected the request (401 Unauthorized). If this persists, configure a valid COINGECKO_API_KEY.',
+        );
+      }
 
-        // Convert to { date, close } — keep only one entry per day
-        const seen = new Set<string>();
-        const result: PricePoint[] = [];
+      // CoinGecko returns 429 when rate limited
+      if (res.status === 429) {
+        throw new InternalServerErrorException(
+          'CoinGecko rate limit reached. Please wait a moment and try again.',
+        );
+      }
 
-        for (const [timestampMs, price] of data.prices) {
-            const dayKey = epochMsToDateString(timestampMs);
-            if (!seen.has(dayKey)) {
-                seen.add(dayKey);
-                result.push({ date: dateStringToEpochMs(dayKey), close: price });
-            }
-        }
+      if (!res.ok) {
+        throw new InternalServerErrorException(
+          `CoinGecko API error: ${res.status} ${res.statusText}`,
+        );
+      }
 
-        return result;
+      data = await res.json();
+    } catch (err) {
+      if (
+        err instanceof InternalServerErrorException ||
+        err instanceof BadRequestException
+      ) {
+        throw err;
+      }
+      throw new InternalServerErrorException(
+        'Failed to reach CoinGecko API. Please try again later.',
+      );
     }
 
-    // ---------------------------------------------------------------------------
-    // AlphaVantage – stock prices
-    // ---------------------------------------------------------------------------
-    /**
+    // CoinGecko returns prices as [[timestamp_ms, price], ...]
+    // One data point per day when range > 90 days
+    if (!data.prices || data.prices.length === 0) {
+      throw new BadRequestException(
+        `No price data found for ${symbol} in the given date range.`,
+      );
+    }
+
+    // Convert to { date, close } — keep only one entry per day
+    const seen = new Set<string>();
+    const result: PricePoint[] = [];
+
+    for (const [timestampMs, price] of data.prices) {
+      const dayKey = epochMsToDateString(timestampMs);
+      if (!seen.has(dayKey)) {
+        seen.add(dayKey);
+        result.push({ date: dateStringToEpochMs(dayKey), close: price });
+      }
+    }
+
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // AlphaVantage – stock prices
+  // ---------------------------------------------------------------------------
+  /**
    * Fetches historical prices from AlphaVantage API.
    *
    * Flow:
@@ -208,77 +237,78 @@ export class PriceService {
    * 7. Sort oldest to newest (AlphaVantage returns newest first) and return
    */
 
-    private async fetchFromAlphaVantage(
-        symbol: string,
-        startDate: number,
-        endDate: number,
-    ): Promise<PricePoint[]> {
-        const apiKey = this.configService.get<string>('ALPHAVANTAGE_API_KEY');
+  private async fetchFromAlphaVantage(
+    symbol: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<PricePoint[]> {
+    const apiKey = this.configService.get<string>('ALPHAVANTAGE_API_KEY');
 
-        if (!apiKey) {
-            throw new InternalServerErrorException(
-                'AlphaVantage API key is not configured. Add ALPHAVANTAGE_API_KEY to your .env file.',
-            );
-        }
-
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
-        this.logger.log(`Fetching AlphaVantage prices for ${symbol} from ${startDate} to ${endDate}`);
-
-        let data: any;
-        try {
-            const res = await fetch(url);
-
-            if (!res.ok) {
-                throw new InternalServerErrorException(
-                    `AlphaVantage API error: ${res.status} ${res.statusText}`,
-                );
-            }
-
-            data = await res.json();
-
-        } catch (err) {
-            if (
-                err instanceof InternalServerErrorException ||
-                err instanceof BadRequestException
-            ) {
-                throw err;
-            }
-            throw new InternalServerErrorException(
-                'Failed to reach AlphaVantage API. Please try again later.',
-            );
-        }
-        // AlphaVantage returns this message when rate limited (25/day on free tier)
-        if (data['Information'] || data['Note']) {
-            throw new InternalServerErrorException(
-                'AlphaVantage rate limit reached (25 requests/day on free tier). Please try again tomorrow.',
-            );
-        }
-
-        const timeSeries = data['Time Series (Daily)'];
-
-        if (!timeSeries) {
-            throw new BadRequestException(
-                `No price data found for ${symbol}. Check if the symbol is correct.`,
-            );
-        }
-
-        const result: PricePoint[] = Object.entries(timeSeries)
-            .filter(([dateStr]) => {
-                const epochMs = dateStringToEpochMs(dateStr);
-                return epochMs >= startDate && epochMs <= endDate;
-            })
-            .map(([dateStr, values]: [string, any]) => ({
-                date: dateStringToEpochMs(dateStr),
-                close: parseFloat(values['4. close']),
-            }))
-            .sort((a, b) => a.date - b.date); // numeric sort instead of string sort
-
-        if (result.length === 0) {
-            throw new BadRequestException(
-                `No price data found for ${symbol} between ${startDate} and ${endDate}.`,
-            );
-        }
-
-        return result;
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'AlphaVantage API key is not configured. Add ALPHAVANTAGE_API_KEY to your .env file.',
+      );
     }
+
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
+    this.logger.log(
+      `Fetching AlphaVantage prices for ${symbol} from ${startDate} to ${endDate}`,
+    );
+
+    let data: any;
+    try {
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new InternalServerErrorException(
+          `AlphaVantage API error: ${res.status} ${res.statusText}`,
+        );
+      }
+
+      data = await res.json();
+    } catch (err) {
+      if (
+        err instanceof InternalServerErrorException ||
+        err instanceof BadRequestException
+      ) {
+        throw err;
+      }
+      throw new InternalServerErrorException(
+        'Failed to reach AlphaVantage API. Please try again later.',
+      );
+    }
+    // AlphaVantage returns this message when rate limited (25/day on free tier)
+    if (data['Information'] || data['Note']) {
+      throw new InternalServerErrorException(
+        'AlphaVantage rate limit reached (25 requests/day on free tier). Please try again tomorrow.',
+      );
+    }
+
+    const timeSeries = data['Time Series (Daily)'];
+
+    if (!timeSeries) {
+      throw new BadRequestException(
+        `No price data found for ${symbol}. Check if the symbol is correct.`,
+      );
+    }
+
+    const result: PricePoint[] = Object.entries(timeSeries)
+      .filter(([dateStr]) => {
+        const epochMs = dateStringToEpochMs(dateStr);
+        return epochMs >= startDate && epochMs <= endDate;
+      })
+      .map(([dateStr, values]: [string, any]) => ({
+        date: dateStringToEpochMs(dateStr),
+        close: parseFloat(values['4. close']),
+      }))
+      .sort((a, b) => a.date - b.date); // numeric sort instead of string sort
+
+    if (result.length === 0) {
+      throw new BadRequestException(
+        `No price data found for ${symbol} between ${startDate} and ${endDate}.`,
+      );
+    }
+
+    return result;
+  }
 }
