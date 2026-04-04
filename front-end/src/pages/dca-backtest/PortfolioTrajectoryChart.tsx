@@ -59,15 +59,19 @@ export function PortfolioTrajectoryChart({
           <CardDescription>{chartDescription}</CardDescription>
         </div>
         <div className="flex items-center gap-4">
-          {/* Legend: equity vs basis */}
+          {/* Legend */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary" />
-              <span className="text-xs text-muted-foreground">Equity</span>
+              <span className="text-xs text-muted-foreground">
+                Portfolio value
+              </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="h-2 w-2 rounded-md bg-muted-foreground/20" />
-              <span className="text-xs text-muted-foreground">Basis</span>
+              <span className="text-xs text-muted-foreground">
+                Total invested
+              </span>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onFullscreenChange}>
@@ -134,6 +138,7 @@ export function PortfolioTrajectoryChart({
                 strokeDasharray: "4 4",
               }}
             />
+            {/* Portfolio value line */}
             <Line
               type="monotone"
               dataKey="value"
@@ -149,6 +154,7 @@ export function PortfolioTrajectoryChart({
                 strokeWidth: 3,
               }}
             />
+            {/* Cumulative invested baseline (step line) */}
             <Line
               type="stepAfter"
               dataKey="invested"
