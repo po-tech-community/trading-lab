@@ -1,7 +1,10 @@
 interface TooltipPayloadItem {
   value?: number;
+  dataKey?: string;
   payload?: {
     close?: number;
+    invested?: number;
+    value?: number;
   };
 }
 
@@ -24,14 +27,24 @@ export function ChartTooltip({
 }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
 
-  const value = Number(payload[0]?.value ?? 0);
-  const invested = Number(payload[1]?.value ?? 0);
-  const close = Number(payload[0]?.payload?.close ?? 0);
+  const portfolioPoint = payload.find((item) => item.dataKey === "value");
+  const investedPoint = payload.find((item) => item.dataKey === "invested");
+
+  const value = Number(
+    portfolioPoint?.value ?? portfolioPoint?.payload?.value ?? 0,
+  );
+  const invested = Number(
+    investedPoint?.value ?? investedPoint?.payload?.invested ?? 0,
+  );
+  const close = Number(portfolioPoint?.payload?.close ?? 0);
 
   const formattedDate = new Date(String(label)).toLocaleDateString("en-US", {
+    day: "numeric",
     month: "short",
     year: "numeric",
   });
+
+  const profit = value - invested;
 
   return (
     <div className="bg-background border p-3 rounded-md shadow-sm">
@@ -65,7 +78,7 @@ export function ChartTooltip({
         <div className="pt-1.5 mt-1.5 border-t border-border flex items-center justify-between">
           <span className="text-xs text-emerald-500">Unrealized profit</span>
           <span className="text-xs font-semibold text-emerald-500">
-            +${(value - invested).toLocaleString()}
+            {profit >= 0 ? "+" : "-"}${Math.abs(profit).toLocaleString()}
           </span>
         </div>
       </div>

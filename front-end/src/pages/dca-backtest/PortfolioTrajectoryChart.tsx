@@ -4,8 +4,8 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  LineChart,
+  Line,
 } from "recharts";
 import {
   Card,
@@ -34,8 +34,8 @@ export interface PortfolioTrajectoryChartProps {
 }
 
 /**
- * Main area chart: portfolio value and cumulative invested over time.
- * Includes legend (Equity / Basis) and fullscreen toggle.
+ * Main line chart: portfolio value and cumulative invested over time.
+ * Includes legend and fullscreen toggle.
  */
 export function PortfolioTrajectoryChart({
   data,
@@ -59,15 +59,19 @@ export function PortfolioTrajectoryChart({
           <CardDescription>{chartDescription}</CardDescription>
         </div>
         <div className="flex items-center gap-4">
-          {/* Legend: equity vs basis */}
+          {/* Legend */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary" />
-              <span className="text-xs text-muted-foreground">Equity</span>
+              <span className="text-xs text-muted-foreground">
+                Portfolio value
+              </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="h-2 w-2 rounded-md bg-muted-foreground/20" />
-              <span className="text-xs text-muted-foreground">Basis</span>
+              <span className="text-xs text-muted-foreground">
+                Total invested
+              </span>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onFullscreenChange}>
@@ -87,24 +91,10 @@ export function PortfolioTrajectoryChart({
         )}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
+          <LineChart
             data={data}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id="colorValueEnh" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="hsl(var(--primary))"
-                  stopOpacity={0.25}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="hsl(var(--primary))"
-                  stopOpacity={0.01}
-                />
-              </linearGradient>
-            </defs>
             <CartesianGrid
               strokeDasharray="4 4"
               vertical={false}
@@ -131,7 +121,13 @@ export function PortfolioTrajectoryChart({
               axisLine={false}
               tickLine={false}
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) =>
+                Number(value).toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  maximumFractionDigits: 0,
+                })
+              }
               dx={-10}
             />
             <RechartsTooltip
@@ -142,15 +138,15 @@ export function PortfolioTrajectoryChart({
                 strokeDasharray: "4 4",
               }}
             />
-            {/* Equity curve (filled area) */}
-            <Area
+            {/* Portfolio value line */}
+            <Line
               type="monotone"
               dataKey="value"
+              name="Portfolio value"
               stroke="hsl(var(--primary))"
               strokeWidth={3}
-              fillOpacity={1}
-              fill="url(#colorValueEnh)"
               animationDuration={800}
+              dot={false}
               activeDot={{
                 r: 6,
                 fill: "hsl(var(--primary))",
@@ -158,17 +154,18 @@ export function PortfolioTrajectoryChart({
                 strokeWidth: 3,
               }}
             />
-            {/* Cumulative invested (step line) */}
-            <Area
+            {/* Cumulative invested baseline (step line) */}
+            <Line
               type="stepAfter"
               dataKey="invested"
+              name="Total invested"
               stroke="hsl(var(--muted-foreground))"
               strokeWidth={2}
-              fill="transparent"
               strokeDasharray="6 6"
               opacity={0.4}
+              dot={false}
             />
-          </AreaChart>
+          </LineChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
