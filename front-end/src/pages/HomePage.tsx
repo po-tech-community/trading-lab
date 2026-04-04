@@ -13,20 +13,24 @@ import { PageHeader } from "@/components/common/PageHeader";
 
 const quickActions = [
   {
-    title: "Portfolio",
-    description: "View holdings and strategy performance",
-    usage: "Coming soon: portfolio summary and allocation breakdown.",
+    title: "Portfolio Backtest",
+    description: "Simulate multi-asset DCA with custom weights",
+    usage:
+      "Allocate weights across multiple assets (BTC, ETH, stocks), set amount & frequency, and see diversified portfolio performance.",
     href: "/home/portfolio",
     icon: PieChart,
-    enabled: false,
+    enabled: true,
+    type: "Multi-asset",
   },
   {
     title: "DCA Backtest",
-    description: "Simulate recurring investment returns",
-    usage: "Pick a symbol, amount, and date range, then run the backtest.",
+    description: "Simulate single-asset recurring investment",
+    usage:
+      "Pick one asset, set amount & frequency, define date range, and analyze returns from historical DCA purchases.",
     href: "/home/backtest",
     icon: LineChart,
     enabled: true,
+    type: "Single-asset",
   },
   {
     title: "AI Advisor",
@@ -75,12 +79,19 @@ export default function HomePage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <Badge
-                      variant={item.enabled ? "default" : "secondary"}
-                      className="shrink-0"
-                    >
-                      {item.enabled ? "Available" : "Coming soon"}
-                    </Badge>
+                    <div className="flex gap-2 shrink-0">
+                      {item.type && (
+                        <Badge variant="outline" className="text-xs">
+                          {item.type}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant={item.enabled ? "default" : "secondary"}
+                        className="shrink-0"
+                      >
+                        {item.enabled ? "Available" : "Coming soon"}
+                      </Badge>
+                    </div>
                   </div>
                   <CardTitle className="text-base">{item.title}</CardTitle>
                   <CardDescription className="text-sm">
