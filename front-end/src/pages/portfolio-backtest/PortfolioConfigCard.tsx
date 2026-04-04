@@ -43,6 +43,10 @@ import {
 import type { RunPortfolioBacktestRequestBody } from "@/lib/backtest-api"
 import { AssetList } from "@/components/portfolio/AssetList"
 import { Separator } from "@/components/ui/separator"
+import {
+  getCryptoMinUtcIsoDate,
+  getTodayUtcIsoDate,
+} from "@/pages/dca-backtest/backtest-form-schema"
  
 // ── Props ─────────────────────────────────────────────────────────────────────
  
@@ -63,6 +67,11 @@ export function PortfolioConfigCard({
   isCollapsed,
   onCollapsedChange,
 }: PortfolioConfigCardProps) {
+  const todayIso = getTodayUtcIsoDate()
+  const oneYearAgoIso = getCryptoMinUtcIsoDate()
+  const defaultStart = oneYearAgoIso > "" ? oneYearAgoIso : "2023-01-01"
+  const defaultEnd = todayIso
+
   const form = useForm<PortfolioFormValues>({
     resolver: zodResolver(portfolioFormSchema) as any,
     defaultValues: {
@@ -72,8 +81,8 @@ export function PortfolioConfigCard({
       ],
       totalAmount: 200,
       frequency: "weekly",
-      startDate: "2025-05-01",
-      endDate: "2025-06-01",
+      startDate: defaultStart,
+      endDate: defaultEnd,
     },
     mode: "onChange",
   })

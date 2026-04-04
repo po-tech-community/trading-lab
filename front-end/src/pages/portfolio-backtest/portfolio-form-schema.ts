@@ -5,6 +5,7 @@
  *  - At least one asset required.
  *  - Each asset must have a unique symbol and a weight > 0.
  *  - Sum of all weights must equal exactly 100.
+ *  - Date range must be ≤ 365 days (synced with DCA form validation).
  */
 
 import { z } from "zod"
@@ -66,6 +67,18 @@ export const portfolioFormSchema = z
             return !Number.isNaN(start) && !Number.isNaN(end) && end > start
         },
         { message: "End date must be after start date.", path: ["endDate"] }
+    )
+    // Date range must be ≤ 365 days (synced with DCA backtest validation)
+    .refine(
+        (data) => {
+            const start = Date.parse(`${data.startDate}T00:00:00.000Z`)
+            const end = Date.parse(`${data.endDate}T00:00:00.000Z`)
+            if (Number.isNaN(start) || Number.isNaN(end)) return true
+            const diffMs = end - start
+            const diffDays = diffMs / (1000 * 60 * 60 * 24)
+            return diffDays <= 365
+        },
+        { message: "Date range cannot exceed 365 days.", path: ["endDate"] }
     )
 
 export type PortfolioFormValues = z.infer<typeof portfolioFormSchema>
