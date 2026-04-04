@@ -22,6 +22,7 @@ import {
     dateStringToEpochMs,
     epochMsToDateString,
 } from '../common/helpers/date.helper';
+import { SUPPORTED_BACKTEST_SYMBOLS } from './supported-symbols';
 
 export interface PricePoint {
     date: number; // epoch milliseconds e.g. 1735689600000
@@ -52,6 +53,16 @@ export class PriceService {
     ): Promise<PricePoint[]> {
         const upper = symbol.toUpperCase();
 
+        if (
+            !SUPPORTED_BACKTEST_SYMBOLS.includes(
+                upper as (typeof SUPPORTED_BACKTEST_SYMBOLS)[number],
+            )
+        ) {
+            throw new BadRequestException(
+                `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
+            );
+        }
+
         if (COINGECKO_SYMBOLS[upper]) {
             return this.fetchFromCoinGecko(upper, startDate, endDate);
         }
@@ -61,7 +72,7 @@ export class PriceService {
         }
 
         throw new BadRequestException(
-            `Symbol "${symbol}" is not supported. Supported symbols: BTC, ETH, AAPL, TSLA`,
+            `Symbol "${symbol}" is not supported. Supported symbols: ${SUPPORTED_BACKTEST_SYMBOLS.join(', ')}`,
         );
     }
 

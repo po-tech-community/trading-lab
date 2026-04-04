@@ -1,49 +1,63 @@
+import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Minimize2, Maximize2, Zap } from "lucide-react"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ApiError } from "@/lib/api-client"
+import { runBacktest, type RunBacktestResponse } from "@/lib/backtest-api"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/common/PageHeader"
+import { Minimize2, Maximize2, Zap } from "lucide-react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
-// DCA Backtest feature components
-import { MOCK_CHART_DATA } from "./dca-backtest/constants"
 import { StrategyConfigCard } from "./dca-backtest/StrategyConfigCard"
 import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards"
 import { StrategyPresetsCard } from "./dca-backtest/StrategyPresetsCard"
 import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart"
+import { timelineToChartData } from "./dca-backtest/timeline-to-chart"
+
+function formatApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const m = error.data?.message
+    if (Array.isArray(m)) return m.join(", ")
+    if (typeof m === "string") return m
+    return error.message
+  }
+  return error instanceof Error ? error.message : "Request failed"
+}
 
 /**
  * DCA Backtest page: simulate recurring investments over historical data.
- *
- * Layout:
- * - Page header with title and fullscreen toggle
- * - Left: Strategy config card (asset, amount, frequency, date range)
- * - Right: Summary stats (invested, value, ROI), presets, and trajectory chart
- *
- * State is local for now; replace with API/hooks when backend is ready.
  */
 export default function DcaBacktestPage() {
-  const [asset, setAsset] = useState("BTC")
-  const [amount, setAmount] = useState("100")
-  const [frequency, setFrequency] = useState("weekly")
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [backtestResult, setBacktestResult] = useState<RunBacktestResponse | null>(null)
 
-  const handleCalculate = () => {
-    console.log(`Calculating returns for ${asset} at ${amount}/per ${frequency}`)
-    // TODO: call backtest API or local engine
-  }
+  const mutation = useMutation({
+    mutationFn: runBacktest,
+    onSuccess: (data) => {
+      setBacktestResult(data)
+      toast.success("Backtest completed")
+    },
+    onError: (err) => {
+      toast.error(formatApiError(err))
+    },
+  })
+
+  const chartData = backtestResult ? timelineToChartData(backtestResult.timeline) : []
+  const chartDescription = backtestResult
+    ? `Performance over the selected range (${chartData.length} points)`
+    : "Run a backtest to see your equity curve"
 
   return (
     <TooltipProvider>
-      {/* Fullscreen mode: fixed overlay; otherwise normal flow */}
       <div
         className={cn(
           "flex flex-col gap-4 pb-10",
           isFullscreen ? "fixed inset-0 z-50 bg-background p-6 overflow-auto" : ""
         )}
       >
-        {/* Page title, description, and fullscreen entry/exit */}
         <PageHeader
           label="Simulator engine v1.0"
           icon={Zap}
@@ -65,33 +79,43 @@ export default function DcaBacktestPage() {
         />
 
         <div className="flex flex-col lg:flex-row gap-4 items-start">
-          {/* Left: strategy parameters (collapsible on small screens) */}
           <StrategyConfigCard
-            asset={asset}
-            onAssetChange={setAsset}
-            amount={amount}
-            onAmountChange={setAmount}
-            frequency={frequency}
-            onFrequencyChange={setFrequency}
-            onCalculate={handleCalculate}
+            onSubmit={(body) => mutation.mutate(body)}
+            isSubmitting={mutation.isPending}
+            submitError={mutation.isError ? formatApiError(mutation.error) : null}
             isCollapsed={isSidebarCollapsed}
             onCollapsedChange={setIsSidebarCollapsed}
           />
 
-          {/* Right: results (stats, presets, chart) */}
           <div className="flex-1 flex flex-col gap-4 w-full overflow-hidden">
-            {/* Invested / Value / ROI summary (mock values) */}
-            <SummaryStatsCards />
+            <SummaryStatsCards summary={backtestResult?.summary ?? null} />
 
-            {/* Quick preset buttons (mock: do not update form yet) */}
             <StrategyPresetsCard />
 
-            {/* Main trajectory chart with fullscreen support */}
-            <PortfolioTrajectoryChart
-              data={MOCK_CHART_DATA}
-              isFullscreen={isFullscreen}
-              onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
-            />
+            {chartData.length > 0 ? (
+              <PortfolioTrajectoryChart
+                data={chartData}
+                isFullscreen={isFullscreen}
+                onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
+                chartDescription={chartDescription}
+              />
+            ) : (
+              <Card
+                className={cn(
+                  "flex-1 bg-card relative overflow-hidden border",
+                  isFullscreen && "min-h-[500px]"
+                )}
+              >
+                <CardHeader className="border-b border-border">
+                  <CardTitle className="text-lg font-semibold">Portfolio trajectory</CardTitle>
+                  <CardDescription>{chartDescription}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex h-[420px] items-center justify-center text-muted-foreground text-sm">
+                  Configure your strategy and choose &quot;Calculate returns&quot; to load historical
+                  performance.
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
