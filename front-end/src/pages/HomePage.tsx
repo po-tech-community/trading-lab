@@ -15,7 +15,8 @@ const quickActions = [
   {
     title: "Portfolio Backtest",
     description: "Simulate multi-asset DCA with custom weights",
-    usage: "Allocate weights across multiple assets (BTC, ETH, stocks), set amount & frequency, and see diversified portfolio performance.",
+    usage:
+      "Allocate weights across multiple assets (BTC, ETH, stocks), set amount & frequency, and see diversified portfolio performance.",
     href: "/home/portfolio",
     icon: PieChart,
     enabled: true,
@@ -24,7 +25,8 @@ const quickActions = [
   {
     title: "DCA Backtest",
     description: "Simulate single-asset recurring investment",
-    usage: "Pick one asset, set amount & frequency, define date range, and analyze returns from historical DCA purchases.",
+    usage:
+      "Pick one asset, set amount & frequency, define date range, and analyze returns from historical DCA purchases.",
     href: "/home/backtest",
     icon: LineChart,
     enabled: true,
@@ -33,7 +35,8 @@ const quickActions = [
   {
     title: "AI Advisor",
     description: "Chat and get market insights",
-    usage: "Coming soon: chat with the advisor after it is wired to real backtest data.",
+    usage:
+      "Coming soon: chat with the advisor after it is wired to real backtest data.",
     href: "/home/ai-advisor",
     icon: Bot,
     enabled: false,

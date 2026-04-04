@@ -44,6 +44,62 @@ export function PortfolioTrajectoryChart({
   chartDescription = "Performance visualization",
   assetLabel = "Coin",
 }: PortfolioTrajectoryChartProps) {
+  const expandedData = data.flatMap((point, index) => {
+    if (index === data.length - 1) return [point];
+
+    const next = data[index + 1];
+    const currentDelta = point.value - point.invested;
+    const nextDelta = next.value - next.invested;
+
+    // Insert a synthetic crossover point when profit/loss sign changes,
+    // so colored segments connect continuously at breakeven.
+    if (currentDelta * nextDelta < 0) {
+      const ratio =
+        Math.abs(currentDelta) / (Math.abs(currentDelta) + Math.abs(nextDelta));
+
+      const pointTime = Date.parse(String(point.date));
+      const nextTime = Date.parse(String(next.date));
+      const interpolatedTime =
+        Number.isNaN(pointTime) || Number.isNaN(nextTime)
+          ? String(point.date)
+          : new Date(pointTime + (nextTime - pointTime) * ratio).toISOString();
+
+      const interpolatedValue =
+        point.value + (next.value - point.value) * ratio;
+      const interpolatedInvested =
+        point.invested + (next.invested - point.invested) * ratio;
+      const breakevenValue = (interpolatedValue + interpolatedInvested) / 2;
+
+      const interpolatedClose =
+        point.close + (next.close - point.close) * ratio;
+
+      return [
+        point,
+        {
+          date: interpolatedTime,
+          value: breakevenValue,
+          invested: breakevenValue,
+          close: interpolatedClose,
+        },
+      ];
+    }
+
+    return [point];
+  });
+
+  const segmentedData = expandedData.map((point) => {
+    const delta = point.value - point.invested;
+    const epsilon = 0.01;
+    const isBreakeven = Math.abs(delta) <= epsilon;
+
+    return {
+      ...point,
+      valueProfit: delta >= 0 ? point.value : null,
+      valueLoss: delta <= 0 ? point.value : null,
+      valueBreakeven: isBreakeven ? point.value : null,
+    };
+  });
+
   return (
     <Card
       className={cn(
@@ -92,7 +148,7 @@ export function PortfolioTrajectoryChart({
       >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={data}
+            data={segmentedData}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
             <CartesianGrid
@@ -138,18 +194,62 @@ export function PortfolioTrajectoryChart({
                 strokeDasharray: "4 4",
               }}
             />
-            {/* Portfolio value line */}
+            {/* Hidden source line for stable tooltip payload */}
             <Line
               type="monotone"
               dataKey="value"
               name="Portfolio value"
-              stroke="hsl(var(--primary))"
+              stroke="transparent"
+              strokeWidth={0}
+              legendType="none"
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+            {/* Portfolio value: losing segment */}
+            <Line
+              type="monotone"
+              dataKey="valueLoss"
+              name="Loss zone"
+              stroke="rgb(239 68 68)"
               strokeWidth={3}
               animationDuration={800}
               dot={false}
               activeDot={{
                 r: 6,
-                fill: "hsl(var(--primary))",
+                fill: "rgb(239 68 68)",
+                stroke: "hsl(var(--background))",
+                strokeWidth: 3,
+              }}
+            />
+            {/* Portfolio value: profitable segment */}
+            <Line
+              type="monotone"
+              dataKey="valueProfit"
+              name="Profit zone"
+              stroke="rgb(16 185 129)"
+              strokeWidth={3}
+              animationDuration={800}
+              dot={false}
+              activeDot={{
+                r: 6,
+                fill: "rgb(16 185 129)",
+                stroke: "hsl(var(--background))",
+                strokeWidth: 3,
+              }}
+            />
+            {/* Portfolio value: breakeven segment (rendered last so black stays on top at crossover) */}
+            <Line
+              type="monotone"
+              dataKey="valueBreakeven"
+              name="Breakeven zone"
+              stroke="#111827"
+              strokeWidth={3}
+              animationDuration={800}
+              dot={{ r: 3, fill: "#111827", stroke: "#111827" }}
+              activeDot={{
+                r: 6,
+                fill: "#111827",
                 stroke: "hsl(var(--background))",
                 strokeWidth: 3,
               }}
@@ -161,7 +261,6 @@ export function PortfolioTrajectoryChart({
               name="Total invested"
               stroke="hsl(var(--muted-foreground))"
               strokeWidth={2}
-              strokeDasharray="6 6"
               opacity={0.4}
               dot={false}
             />

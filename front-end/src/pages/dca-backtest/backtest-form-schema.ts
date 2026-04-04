@@ -73,7 +73,7 @@ export function backtestFormValuesToRequest(
 ): RunBacktestRequestBody {
   return {
     symbol: values.symbol,
-    totalAmount: values.amount,
+    amount: values.amount,
     frequency: values.frequency,
     startDate: Date.parse(`${values.startDate}T00:00:00.000Z`),
     endDate: Date.parse(`${values.endDate}T00:00:00.000Z`),
