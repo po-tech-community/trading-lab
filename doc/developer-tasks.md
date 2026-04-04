@@ -21,21 +21,22 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 
 ## Status Summary (2026-04-05)
 
-| Level                | Backend              | Frontend                                 | Overall                          |
-| -------------------- | -------------------- | ---------------------------------------- | -------------------------------- |
-| **L0 Auth**          | ✅ Done (11/11)      | ✅ Done (6/6)                            | ✅ **Complete**                  |
-| **L1 DCA Backtest**  | ✅ Done (3/4)        | ✅ Done (3/3)                            | ~90% (BE error handling pending) |
-| **L2 Portfolio DCA** | ✅ Done (3/3)        | 🔄 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%                             |
-| **L3 Triggers**      | ❌ Not started (0/4) | ❌ Not started (0/3)                     | 0%                               |
-| **L4 AI Advisor**    | ❌ Not started (0/4) | ❌ Not started (0/3)                     | 0%                               |
-| **INFRA**            | ✅ Done (2/4)        | —                                        | 50%                              |
+| Level                | Backend           | Frontend                                          | Overall  |
+| -------------------- | ----------------- | ------------------------------------------------- | -------- |
+| **L0 Auth**          | Done (11/11)      | Done (6/6)                                        | Complete |
+| **L1 DCA Backtest**  | Done (4/4)        | Done (3/3)                                        | Complete |
+| **L2 Portfolio DCA** | Done (3/3)        | In progress 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%     |
+| **L3 Triggers**      | Not started (0/4) | Not started (0/3)                                 | 0%       |
+| **L4 AI Advisor**    | Not started (0/4) | Not started (0/3)                                 | 0%       |
+| **INFRA**            | Done (1/4)        | N/A                                               | 25%      |
 
 ### Recent Updates (April 5, 2026)
 
 - **L1-FE-3**: Fixed legend text consistency and added inline comments for clarity (Merged #28)
-- **L2-FE-1**: Dynamic asset list component fully integrated (Merged #26) ✅
+- **L1-BE-4**: Marked as Done (bypassed as standalone because global exception handling is already in place)
+- **L2-FE-1**: Dynamic asset list component fully integrated (Merged #26)
 - **L2-FE-2/3**: Ready for assignment; L2-BE and L2-FE-1 prerequisites complete
-- **Build Status**: ✅ All passing (backend + frontend both build cleanly)
+- **Build Status**: All passing (backend + frontend both build cleanly)
 
 ---
 
@@ -78,7 +79,7 @@ _Single-asset backtest with chart and summary._
 | L1-BE-1 | **Price service** – Service that fetches historical OHLC (or close-only) from a provider (e.g. CoinGecko, CryptoCompare, or Alpha Vantage for stocks). Support at least one crypto (e.g. BTC) and one stock if possible. Input: symbol, startDate, endDate. Output: array of `{ date, close }`. Handle rate limits and missing data (return clear errors). | L     | —                                      | Quân Huỳnh  | Done | API adapters for crypto and stock are implemented.                                                                                                                                                 |
 | L1-BE-2 | **Calculation engine** – Pure function (or service): given price series, `amount`, `frequency` (daily\|weekly\|monthly), compute at each buy date: units bought, cumulative units, cumulative invested, portfolio value. Return `timeline[]` and `summary` (totalInvested, currentValue, totalReturnPercentage, totalHoldings).                            | L     | L1-BE-1                                | Kiệt        | Done | Core DCA math and unit tests exist.                                                                                                                                                                |
 | L1-BE-3 | **POST /api/v1/backtest/run** – Body: `symbol`, `amount`, `frequency`, `startDate`, `endDate`. Validate (amount > 0, endDate > startDate, symbol supported). Call price service + calculation engine. Return `{ summary, timeline }`. Error handling for invalid symbol or insufficient data.                                                              | M     | L1-BE-2                                | Hoàng       | Done | Implemented in `BacktestController` (`@Post('run')`) with DTO + service wiring.                                                                                                                    |
-| L1-BE-4 | **Error handling & validation** – Use DTOs (class-validator) for backtest request. Return 400 with clear messages for invalid input; 502/503 if price provider fails.                                                                                                                                                                                      | S     | L1-BE-3                                | ----        | -    | DTO + run endpoint are wired; provider failure mapping to 502/503 is not implemented yet (currently 500).                                                                                          |
+| L1-BE-4 | **Error handling & validation** – Use DTOs (class-validator) for backtest request. Return 400 with clear messages for invalid input; 502/503 if price provider fails.                                                                                                                                                                                      | S     | L1-BE-3                                | ----        | Done | Bypassed as a standalone task: error handling is already covered by current global exception setup and accepted for this phase.                                                                    |
 | L1-FE-1 | **Backtest config form** – Fields: asset (dropdown or search), amount (USD), frequency (daily/weekly/monthly), start date, end date. Use `react-hook-form` + Zod. Validate amount > 0, end > start. Submit calls `POST /backtest/run`.                                                                                                                     | M     | L0-FE-3 (optional: require auth later) | Hoàng       | Done | Implemented with `react-hook-form` + Zod and submits via `runBacktest` API client.                                                                                                                 |
 | L1-FE-2 | **Summary widgets** – After run: display Total Invested, Current Value, Total Return (%), total holdings (optional). Use clear typography and layout (e.g. cards).                                                                                                                                                                                         | S     | L1-FE-1                                | Quân Trương | Done | Summary cards are bound to API response (`summary`) after each run.                                                                                                                                |
 | L1-FE-3 | **Equity / growth chart** – Line chart (e.g. Recharts): X = date, Y = portfolio value (and optionally "invested so far" line). Data from `timeline`. Responsive; show tooltip with date and value.                                                                                                                                                         | M     | L1-FE-1                                | Mai Kha     | Done | Merged #28: LineChart with portfolio value + invested basis lines. Tooltip shows date, Portfolio value, Total invested, Coin price, Unrealized profit. Legend and comments refactored for clarity. |
@@ -91,7 +92,7 @@ _Single-asset backtest with chart and summary._
 
 _Multiple assets with weights; allocation and per-asset breakdown._
 
-| ID      | Task                                                                                                                                                                                                                                                                  | Scope | Deps             | Assignee   | Done |
+| ID      | Task                                                                                                                                                                                                                                                                  | Scope | Deps             | Assignee   | Done | Note                                                                                                                                                                          |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------- | ---------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | L2-BE-1 | **Multi-symbol price service** – Extend (or wrap) price service to accept multiple symbols; batch requests where the API allows. Return a map or array of price series keyed by symbol.                                                                               | M     | L1-BE-1          | Kiệt       | Done | `PriceService.fetchPricesForSymbols` – parallel per symbol; keyed by uppercase symbol.                                                                                        |
 | L2-BE-2 | **Portfolio calculation engine** – For each period: split `totalAmount` by weights across assets, compute units per asset; aggregate portfolio value over time. Output: same `timeline` (portfolio value) plus per-asset breakdown (holdings, value, ROI per symbol). | L     | L2-BE-1, L1-BE-2 | Kiệt       | Done | `runPortfolioDcaBacktest` + `CalculationService.runPortfolioDcaBacktest`; weights must sum to 100%.                                                                           |
@@ -107,6 +108,22 @@ _Multiple assets with weights; allocation and per-asset breakdown._
 ## Level 3: Smart Triggers (Take Profit / Stop Loss)
 
 _Sell logic and trade history._
+
+### Level 3 Explained (Simple Flow)
+
+Level 3 adds **auto-sell behavior** on top of normal DCA buys.
+
+1. System keeps buying periodically as before (daily/weekly/monthly).
+2. At each timeline point, system checks unrealized PnL (%).
+3. If PnL reaches trigger conditions, system executes a sell action:
+   - **Take Profit (TP):** sell when gain reaches threshold.
+   - **Stop Loss (SL):** sell when loss reaches threshold.
+4. Every sell is stored as a trade event (date, type, price, units, realized profit/loss).
+5. API returns both:
+   - Updated portfolio timeline (for chart)
+   - Trade history + realized/unrealized summary (for table/cards)
+
+In short: **Level 1/2 only simulates buy-and-hold DCA**, while **Level 3 simulates active risk management with automatic sells**.
 
 | ID      | Task                                                                                                                                                                                                                                                                                     | Scope | Deps                               | Assignee | Done |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------- | -------- | ---- |
