@@ -111,12 +111,3 @@ export class BacktestController {
         return result;
     }
 }
-
-
-
-
-
-
-
-
-
