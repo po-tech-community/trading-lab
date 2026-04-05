@@ -12,7 +12,7 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 - **L1** = Level 1 (DCA Backtest MVP)
 - **L2** = Level 2 (Portfolio DCA)
 - **L3** = Level 3 (Triggers)
-- **L4** = Level 4 (AI Advisor)
+- **L4** = Level 4 (AI Adapt)
 - **FE** = Frontend · **BE** = Backend
 
 **Scope:** S = Small (≈0.5–1 day) · M = Medium (1–2 days) · L = Large (2+ days)
@@ -27,7 +27,7 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 | **L1 DCA Backtest**  | Done (4/4)        | Done (3/3)                                        | Complete |
 | **L2 Portfolio DCA** | Done (3/3)        | In progress 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%     |
 | **L3 Triggers**      | Not started (0/4) | Not started (0/3)                                 | 0%       |
-| **L4 AI Advisor**    | Not started (0/4) | Not started (0/3)                                 | 0%       |
+| **L4 AI Adapt**      | Not started (0/6) | Not started (0/5)                                 | 0%       |
 | **INFRA**            | Done (1/4)        | N/A                                               | 25%      |
 
 ### Recent Updates (April 5, 2026)
@@ -125,21 +125,21 @@ Level 3 adds **auto-sell behavior** on top of normal DCA buys.
 
 In short: **Level 1/2 only simulates buy-and-hold DCA**, while **Level 3 simulates active risk management with automatic sells**.
 
-| ID      | Task                                                                                                                                                                                                                                                                                     | Scope | Deps                               | Assignee | Done |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------- | -------- | ---- |
-| L3-BE-1 | **Cost basis & threshold tracking** – In the simulation loop, track cost basis per unit (or total) and current value. Compute unrealized P&amp;L % at each step.                                                                                                                         | M     | L1-BE-2 (and L2-BE-2 if portfolio) | Dev 1    | -    |
-| L3-BE-2 | **Sell logic** – When unrealized profit % ≥ takeProfit threshold (or loss % ≥ stopLoss), execute sell: convert `sellAction` % of holdings to USD; record trade (date, type, price, units, profit). Update cash balance and holdings. Support both TP and SL; optional: sell 100% or 50%. | L     | L3-BE-1                            | Dev 2    | -    |
-| L3-BE-3 | **Extended backtest response** – Add to response: `summary.realizedProfit`, `summary.unrealizedValue`, `trades[]` (date, type, price, profit, etc.). Keep existing `timeline` for chart.                                                                                                 | M     | L3-BE-2                            | Dev 3    | -    |
-| L3-BE-4 | **API extension** – Extend `POST /api/v1/backtest/run` (and optionally portfolio) body with `triggers: { takeProfit: { threshold, sellAction }, stopLoss: { threshold, sellAction } }`. Validate thresholds and sellAction in range.                                                     | S     | L3-BE-3                            | Dev 4    | -    |
-| L3-FE-1 | **Trigger settings UI** – Toggle or section: enable Take Profit (threshold %, sell %), enable Stop Loss (threshold %, sell %). Include in same form as backtest config.                                                                                                                  | S     | L1-FE-1                            | Dev 1    | -    |
-| L3-FE-2 | **Sell markers on chart** – On the equity chart, add markers (dots or vertical lines) at each sell date; tooltip shows trade details.                                                                                                                                                    | M     | L1-FE-3, L3-BE-3                   | Dev 2    | -    |
-| L3-FE-3 | **Trade history table** – Table below chart: columns e.g. Date, Type (TP/SL), Price, Amount, Realized Profit. Data from `trades`.                                                                                                                                                        | S     | L3-BE-3                            | Dev 3    | -    |
+| ID      | Task                                                                                                                                                                                                                                                                                     | Scope | Deps                               | Assignee    | Done |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------- | ----------- | ---- |
+| L3-BE-1 | **Cost basis & threshold tracking** – In the simulation loop, track cost basis per unit (or total) and current value. Compute unrealized P&amp;L % at each step.                                                                                                                         | M     | L1-BE-2 (and L2-BE-2 if portfolio) | Kha         | -    |
+| L3-BE-2 | **Sell logic** – When unrealized profit % ≥ takeProfit threshold (or loss % ≥ stopLoss), execute sell: convert `sellAction` % of holdings to USD; record trade (date, type, price, units, profit). Update cash balance and holdings. Support both TP and SL; optional: sell 100% or 50%. | L     | L3-BE-1                            | Kha         | -    |
+| L3-BE-3 | **Extended backtest response** – Add to response: `summary.realizedProfit`, `summary.unrealizedValue`, `trades[]` (date, type, price, profit, etc.). Keep existing `timeline` for chart.                                                                                                 | M     | L3-BE-2                            | Quân Trương | -    |
+| L3-BE-4 | **API extension** – Extend `POST /api/v1/backtest/run` (and optionally portfolio) body with `triggers: { takeProfit: { threshold, sellAction }, stopLoss: { threshold, sellAction } }`. Validate thresholds and sellAction in range.                                                     | S     | L3-BE-3                            | Quân Trương | -    |
+| L3-FE-1 | **Trigger settings UI** – Toggle or section: enable Take Profit (threshold %, sell %), enable Stop Loss (threshold %, sell %). Include in same form as backtest config.                                                                                                                  | S     | L1-FE-1                            | Kiệt        | -    |
+| L3-FE-2 | **Sell markers on chart** – On the equity chart, add markers (dots or vertical lines) at each sell date; tooltip shows trade details.                                                                                                                                                    | M     | L1-FE-3, L3-BE-3                   | Quân Huỳnh  | -    |
+| L3-FE-3 | **Trade history table** – Table below chart: columns e.g. Date, Type (TP/SL), Price, Amount, Realized Profit. Data from `trades`.                                                                                                                                                        | S     | L3-BE-3                            | Hoàng       | -    |
 
 **Definition of done (Level 3):** User can set TP/SL, run backtest, see realized vs unrealized in summary, sell markers on chart, and trade history table.
 
 ---
 
-## Level 4: AI Advisor
+## Level 4: AI Adapt
 
 _OpenAI integration and chat with backtest context._
 
@@ -149,11 +149,15 @@ _OpenAI integration and chat with backtest context._
 | L4-BE-2 | **Prompt generator** – Convert backtest result (summary, timeline snippet, trades if any) into a short text context for the LLM. Include: strategy params, key metrics, optional recent timeline points.                                                    | M     | L1-BE-2, L4-BE-1 | Dev 1    | -    |
 | L4-BE-3 | **POST /api/v1/ai/analyze** – Body: `backtestId` (or raw backtest result) and `userQuery`. Build context with prompt generator; call LLM with system prompt (e.g. “You are a DCA strategy advisor”) + user message. Return `{ advice, suggestedActions? }`. | M     | L4-BE-2          | Dev 5    | -    |
 | L4-BE-4 | **Chat session / history** (optional) – Store or manage conversation per backtest/session so user can ask follow-ups with same context.                                                                                                                     | M     | L4-BE-3          | Dev 3    | -    |
+| L4-BE-5 | **MCP setup & registry** – Set up MCP client runtime, provider registry, tool discovery, environment configuration, and permission policy (allow/deny list + audit metadata). Include timeout/retry defaults and fallback strategy.                         | M     | L4-BE-3          | Dev 4    | -    |
+| L4-BE-6 | **MCP domain tools integration** – Add concrete MCP-powered tools for AI Advisor (market snapshot, portfolio diagnostics, risk checks), map tool outputs into model context, and return tool-backed evidence in final advice payload.                       | L     | L4-BE-5          | Dev 4    | -    |
 | L4-FE-1 | **AI Advisor panel** – Slide-over or modal: “Consult AI Advisor” opens panel. Show current backtest summary in panel header or first message.                                                                                                               | S     | L1-FE-2, L1-FE-3 | Dev 1    | -    |
 | L4-FE-2 | **Chat UI** – Input for user message; display assistant reply with markdown rendering. Loading state while request in flight. Optional: stream response for better UX.                                                                                      | M     | L4-BE-3          | Dev 2    | -    |
 | L4-FE-3 | **Suggested actions** – If API returns `suggestedActions`, show as chips or buttons (e.g. “Increase frequency to Weekly”) that can prefill the form or scroll to config.                                                                                    | S     | L4-FE-2          | Dev 5    | -    |
+| L4-FE-4 | **MCP setup UX (approval + trace)** – Add MCP execution panel in chat to show tool name/purpose/input preview, approve/deny sensitive actions, and display tool execution status/errors.                                                                    | M     | L4-BE-5, L4-FE-2 | Dev 2    | -    |
+| L4-FE-5 | **MCP feature UX (result cards)** – Render structured MCP outputs as reusable cards/widgets (market snapshot, risk check, allocation diagnostics) and connect them with suggested actions in chat flow.                                                     | M     | L4-BE-6, L4-FE-4 | Dev 2    | -    |
 
-**Definition of done (Level 4):** User can open AI Advisor from results, ask a question, get markdown advice and optional suggested actions.
+**Definition of done (Level 4):** User can open AI Advisor from results, ask a question, get markdown advice and optional suggested actions. MCP is delivered in two phases: setup (registry/policy/approval trace) and feature (domain tool outputs rendered as cards), producing grounded tool-backed analysis in UI.
 
 ---
 
@@ -174,11 +178,11 @@ _OpenAI integration and chat with backtest context._
 2. **Sprint 1 (MVP):** L1-BE-1 → L1-BE-2 → L1-BE-3 · L1-FE-1, L1-FE-2, L1-FE-3.
 3. **Sprint 2 (Portfolio):** L2-BE-1 → L2-BE-2 → L2-BE-3 · L2-FE-1, L2-FE-2, L2-FE-3.
 4. **Sprint 3 (Triggers):** L3-BE-1 → L3-BE-2 → L3-BE-3, L3-BE-4 · L3-FE-1, L3-FE-2, L3-FE-3.
-5. **Sprint 4 (AI):** L4-BE-1 → L4-BE-2 → L4-BE-3 · L4-FE-1, L4-FE-2, L4-FE-3.
+5. **Sprint 4 (AI Adapt):** L4-BE-1 → L4-BE-2 → L4-BE-3 → L4-BE-5 (MCP setup) → L4-BE-6 (MCP features) · L4-FE-1, L4-FE-2, L4-FE-3, L4-FE-4 (MCP setup UX), L4-FE-5 (MCP feature UX).
 
 INFRA tasks can be scheduled in parallel or in Sprint 0/1.
 
-**5 developers, each with backend + frontend:** Assignees in the tables above (Dev 1–5) are set so that **every developer has both BE and FE tasks** across the project. Schedule work by sprint so that **each week every developer has at least one task** (no one idle). Example per sprint: **Sprint 0** — Dev 1–5 each have L0 BE + FE. **Sprint 1** — Dev 1–3: L1 BE/FE; Dev 4: L1-FE-3; Dev 5: INFRA-2. **Sprint 2** — Dev 1–3: L2 BE/FE; Dev 4: INFRA-3; Dev 5: INFRA-1 (docs). **Sprint 3** — Dev 1–4: L3 BE/FE; Dev 5: INFRA-1. **Sprint 4** — Dev 1–5: L4 BE/FE. Replace _Dev 1_ … _Dev 5_ with real names when assigning.
+**5 developers, each with backend + frontend:** Assignees in the tables above (Dev 1–5) are set so that **every developer has both BE and FE tasks** across the project. Schedule work by sprint so that **each week every developer has at least one task** (no one idle). Example per sprint: **Sprint 0** — Dev 1–5 each have L0 BE + FE. **Sprint 1** — Dev 1–3: L1 BE/FE; Dev 4: L1-FE-3; Dev 5: INFRA-2. **Sprint 2** — Dev 1–3: L2 BE/FE; Dev 4: INFRA-3; Dev 5: INFRA-1 (docs). **Sprint 3** — Dev 1–4: L3 BE/FE; Dev 5: INFRA-1. **Sprint 4** — Dev 1: L4-BE-2 + L4-FE-1, Dev 2: L4-FE-2 + L4-FE-4 + L4-FE-5 (MCP setup/feature UX), Dev 3: L4-BE-4 + L4-FE-3, Dev 4: L4-BE-1 + L4-BE-5 + L4-BE-6 (MCP setup/feature BE), Dev 5: L4-BE-3 + INFRA-1 updates for AI/MCP API docs. Replace _Dev 1_ … _Dev 5_ with real names when assigning.
 
 **Optional (Phase 2):** Strategy CRUD — save/load/edit/delete strategies (entity, endpoints, "My strategies" UI). Not required for first release.
 
