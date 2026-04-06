@@ -15,6 +15,9 @@ export interface BacktestTimelinePoint {
   cumulativeUnits: number;
   cumulativeInvested: number;
   portfolioValue: number;
+  costBasisPerUnit: number;
+  currentValue: number;
+  unrealizedProfitLossPercentage: number;
 }
 
 export interface BacktestSummary {
@@ -65,6 +68,9 @@ export interface PortfolioBacktestTimelinePoint {
   date: number;
   portfolioValue: number;
   cumulativeInvested: number;
+  costBasisTotal: number;
+  currentValue: number;
+  unrealizedProfitLossPercentage: number;
   assets: PortfolioTimelineAssetSlice[];
 }
 
@@ -179,6 +185,15 @@ export function runSingleAssetDcaBacktest(
       numberOfPurchases += 1;
 
       const portfolioValueBn = cumulativeUnitsBn.multipliedBy(closeBn);
+      const costBasisPerUnitBn = cumulativeUnitsBn.isZero()
+        ? new BigNumber(0)
+        : cumulativeInvestedBn.dividedBy(cumulativeUnitsBn);
+      const unrealizedProfitLossPercentageBn = cumulativeInvestedBn.isZero()
+        ? new BigNumber(0)
+        : portfolioValueBn
+            .minus(cumulativeInvestedBn)
+            .dividedBy(cumulativeInvestedBn)
+            .multipliedBy(100);
       timeline.push({
         date,
         close: point.close,
@@ -186,6 +201,9 @@ export function runSingleAssetDcaBacktest(
         cumulativeUnits: bnToNumber(cumulativeUnitsBn),
         cumulativeInvested: bnToNumber(cumulativeInvestedBn),
         portfolioValue: bnToNumber(portfolioValueBn),
+        costBasisPerUnit: bnToNumber(costBasisPerUnitBn),
+        currentValue: bnToNumber(portfolioValueBn),
+        unrealizedProfitLossPercentage: bnToNumber(unrealizedProfitLossPercentageBn),
       });
 
       nextBuy = nextBuyDateEpochMs(nextBuy, frequency);
@@ -399,6 +417,16 @@ export function runPortfolioDcaBacktest(
       date: markDate,
       portfolioValue: bnToNumber(portfolioValueBn),
       cumulativeInvested: bnToNumber(totalInvestedBn),
+      costBasisTotal: bnToNumber(totalInvestedBn),
+      currentValue: bnToNumber(portfolioValueBn),
+      unrealizedProfitLossPercentage: totalInvestedBn.isZero()
+        ? 0
+        : bnToNumber(
+            portfolioValueBn
+              .minus(totalInvestedBn)
+              .dividedBy(totalInvestedBn)
+              .multipliedBy(100),
+          ),
       assets: slices,
     });
 

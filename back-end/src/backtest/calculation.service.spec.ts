@@ -31,6 +31,12 @@ describe('runSingleAssetDcaBacktest', () => {
     expect(result.summary.totalHoldings).toBeCloseTo(19, 10); // 10 + 5 + 4
     expect(result.summary.currentValue).toBeCloseTo(475, 10); // 19 * 25
     expect(result.summary.totalReturnPercentage).toBeCloseTo(58.333333, 5);
+    expect(result.timeline[0].costBasisPerUnit).toBeCloseTo(10, 10);
+    expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[2].costBasisPerUnit).toBeCloseTo(300 / 19, 10);
+    expect(result.timeline[2].currentValue).toBeCloseTo(475, 10);
+    expect(result.timeline[2].unrealizedProfitLossPercentage).toBeCloseTo(58.333333, 5);
   });
 
   it('handles weekly schedule when some calendar days have no prices', () => {
@@ -112,6 +118,12 @@ describe('runPortfolioDcaBacktest', () => {
     expect(result.summary.currentValue).toBeCloseTo(300, 5);
     expect(result.timeline).toHaveLength(2);
     expect(result.timeline[1].portfolioValue).toBeCloseTo(300, 5);
+    expect(result.timeline[0].costBasisTotal).toBeCloseTo(100, 10);
+    expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[1].costBasisTotal).toBeCloseTo(200, 10);
+    expect(result.timeline[1].currentValue).toBeCloseTo(300, 10);
+    expect(result.timeline[1].unrealizedProfitLossPercentage).toBeCloseTo(50, 10);
   });
 
   it('throws when weights do not sum to 100', () => {
@@ -156,4 +168,3 @@ describe('runPortfolioDcaBacktest', () => {
     expect(portfolio.summary.numberOfPurchases).toBe(single.summary.numberOfPurchases);
   });
 });
-
