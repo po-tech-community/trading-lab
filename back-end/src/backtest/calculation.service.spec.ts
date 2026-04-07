@@ -3,6 +3,7 @@ import {
   runPortfolioDcaBacktest,
   runSingleAssetDcaBacktest,
   type RunDcaBacktestParams,
+  type RunSingleAssetDcaBacktestParams,
 } from './calculation.service';
 import type { PricePoint } from './price.service';
 
@@ -83,6 +84,60 @@ describe('runSingleAssetDcaBacktest', () => {
     expect(result.summary.totalInvested).toBe(300);
     expect(result.summary.totalHoldings).toBeCloseTo(17.5, 10); // 10 + 5 + 2.5
     expect(result.summary.currentValue).toBeCloseTo(700, 10); // 17.5 * 40
+  });
+
+  it('executes take-profit sells and updates holdings', () => {
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 20 },
+      { date: day('2025-01-03'), close: 25 },
+    ];
+
+    const params: RunSingleAssetDcaBacktestParams = {
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: {
+        takeProfit: {
+          threshold: 50,
+          sellAction: 50,
+        },
+      },
+    };
+    const result = runSingleAssetDcaBacktest(prices, params);
+
+    expect(result.timeline[1].cumulativeUnits).toBeCloseTo(7.5, 10);
+    expect(result.timeline[1].portfolioValue).toBeCloseTo(300, 10);
+    expect(result.summary.totalHoldings).toBeCloseTo(11.5, 10);
+    expect(result.summary.currentValue).toBeCloseTo(437.5, 10);
+  });
+
+  it('executes stop-loss sells and moves value to cash', () => {
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 5 },
+    ];
+
+    const params: RunSingleAssetDcaBacktestParams = {
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-02'),
+      triggers: {
+        stopLoss: {
+          threshold: 20,
+          sellAction: 100,
+        },
+      },
+    };
+    const result = runSingleAssetDcaBacktest(prices, params);
+
+    expect(result.timeline[1].cumulativeUnits).toBeCloseTo(0, 10);
+    expect(result.timeline[1].portfolioValue).toBeCloseTo(150, 10);
+    expect(result.timeline[1].currentValue).toBeCloseTo(150, 10);
+    expect(result.summary.totalHoldings).toBeCloseTo(0, 10);
+    expect(result.summary.currentValue).toBeCloseTo(150, 10);
   });
 });
 

@@ -7,6 +7,19 @@ import { isFiniteNumber } from './utils/is-finite-number.util';
 
 export type { DcaFrequency } from './dto/dca-frequency';
 export type { RunDcaBacktestParams } from './dto/run-dca-backtest.dto';
+export interface BacktestTriggerParams {
+  threshold: number;
+  sellAction: number;
+}
+
+export interface BacktestTriggersParams {
+  takeProfit?: BacktestTriggerParams;
+  stopLoss?: BacktestTriggerParams;
+}
+
+export interface RunSingleAssetDcaBacktestParams extends RunDcaBacktestParams {
+  triggers?: BacktestTriggersParams;
+}
 
 export interface BacktestTimelinePoint {
   date: number; // epoch ms (UTC midnight)
@@ -18,6 +31,15 @@ export interface BacktestTimelinePoint {
   costBasisPerUnit: number;
   currentValue: number;
   unrealizedProfitLossPercentage: number;
+}
+
+interface BacktestTrade {
+  date: number;
+  type: 'takeProfit' | 'stopLoss';
+  price: number;
+  units: number;
+  profit: number;
+  sellAction: number;
 }
 
 export interface BacktestSummary {
@@ -129,6 +151,42 @@ function bnToNumber(n: BigNumber): number {
   return n.toNumber();
 }
 
+function validateTriggerConfig(
+  trigger: BacktestTriggerParams | undefined,
+  label: 'takeProfit' | 'stopLoss',
+) {
+  if (!trigger) return;
+
+  if (!isFiniteNumber(trigger.threshold) || trigger.threshold <= 0) {
+    throw new BadRequestException(`${label}.threshold must be greater than 0.`);
+  }
+
+  if (!isFiniteNumber(trigger.sellAction) || trigger.sellAction <= 0 || trigger.sellAction > 100) {
+    throw new BadRequestException(`${label}.sellAction must be greater than 0 and at most 100.`);
+  }
+}
+
+function determineTriggeredTradeType(
+  unrealizedProfitLossPercentageBn: BigNumber,
+  triggers: BacktestTriggersParams | undefined,
+): 'takeProfit' | 'stopLoss' | null {
+  if (triggers?.takeProfit) {
+    const takeProfitThresholdBn = new BigNumber(triggers.takeProfit.threshold);
+    if (unrealizedProfitLossPercentageBn.isGreaterThanOrEqualTo(takeProfitThresholdBn)) {
+      return 'takeProfit';
+    }
+  }
+
+  if (triggers?.stopLoss) {
+    const stopLossThresholdBn = new BigNumber(triggers.stopLoss.threshold);
+    if (unrealizedProfitLossPercentageBn.isLessThanOrEqualTo(stopLossThresholdBn.negated())) {
+      return 'stopLoss';
+    }
+  }
+
+  return null;
+}
+
 /**
  * Pure calculation engine for a single-asset DCA backtest.
  *
@@ -142,9 +200,9 @@ function bnToNumber(n: BigNumber): number {
  */
 export function runSingleAssetDcaBacktest(
   prices: PricePoint[],
-  params: RunDcaBacktestParams,
+  params: RunSingleAssetDcaBacktestParams,
 ): RunDcaBacktestResult {
-  const { amount, frequency } = params;
+  const { amount, frequency, triggers } = params;
 
   if (!isFiniteNumber(params.startDate) || !isFiniteNumber(params.endDate)) {
     throw new BadRequestException('startDate and endDate must be epoch milliseconds.');
@@ -163,9 +221,15 @@ export function runSingleAssetDcaBacktest(
 
   const amountBn = new BigNumber(amount);
   const timeline: BacktestTimelinePoint[] = [];
+  const trades: BacktestTrade[] = [];
   let cumulativeUnitsBn = new BigNumber(0);
   let cumulativeInvestedBn = new BigNumber(0);
+  let remainingCostBasisBn = new BigNumber(0);
+  let cashBalanceBn = new BigNumber(0);
   let numberOfPurchases = 0;
+
+  validateTriggerConfig(triggers?.takeProfit, 'takeProfit');
+  validateTriggerConfig(triggers?.stopLoss, 'stopLoss');
 
   let nextBuy = startDate;
 
@@ -182,18 +246,65 @@ export function runSingleAssetDcaBacktest(
       const unitsBoughtBn = amountBn.dividedBy(closeBn);
       cumulativeUnitsBn = cumulativeUnitsBn.plus(unitsBoughtBn);
       cumulativeInvestedBn = cumulativeInvestedBn.plus(amountBn);
+      remainingCostBasisBn = remainingCostBasisBn.plus(amountBn);
       numberOfPurchases += 1;
 
-      const portfolioValueBn = cumulativeUnitsBn.multipliedBy(closeBn);
-      const costBasisPerUnitBn = cumulativeUnitsBn.isZero()
+      let holdingsValueBn = cumulativeUnitsBn.multipliedBy(closeBn);
+      let costBasisPerUnitBn = cumulativeUnitsBn.isZero()
         ? new BigNumber(0)
-        : cumulativeInvestedBn.dividedBy(cumulativeUnitsBn);
-      const unrealizedProfitLossPercentageBn = cumulativeInvestedBn.isZero()
+        : remainingCostBasisBn.dividedBy(cumulativeUnitsBn);
+      let unrealizedProfitLossPercentageBn = remainingCostBasisBn.isZero()
         ? new BigNumber(0)
-        : portfolioValueBn
-            .minus(cumulativeInvestedBn)
-            .dividedBy(cumulativeInvestedBn)
+        : holdingsValueBn
+            .minus(remainingCostBasisBn)
+            .dividedBy(remainingCostBasisBn)
             .multipliedBy(100);
+
+      const triggeredTradeType = determineTriggeredTradeType(
+        unrealizedProfitLossPercentageBn,
+        triggers,
+      );
+
+      if (triggeredTradeType) {
+        const triggerConfig = triggers?.[triggeredTradeType];
+        if (triggerConfig && cumulativeUnitsBn.isGreaterThan(0)) {
+          const sellFractionBn = new BigNumber(triggerConfig.sellAction).dividedBy(100);
+          const unitsToSellBn = cumulativeUnitsBn.multipliedBy(sellFractionBn);
+          const saleProceedsBn = unitsToSellBn.multipliedBy(closeBn);
+          const soldCostBasisBn = costBasisPerUnitBn.multipliedBy(unitsToSellBn);
+          const realizedProfitBn = saleProceedsBn.minus(soldCostBasisBn);
+
+          cumulativeUnitsBn = cumulativeUnitsBn.minus(unitsToSellBn);
+          remainingCostBasisBn = BigNumber.max(
+            0,
+            remainingCostBasisBn.minus(soldCostBasisBn),
+          );
+          cashBalanceBn = cashBalanceBn.plus(saleProceedsBn);
+
+          trades.push({
+            date,
+            type: triggeredTradeType,
+            price: point.close,
+            units: bnToNumber(unitsToSellBn),
+            profit: bnToNumber(realizedProfitBn),
+            sellAction: triggerConfig.sellAction,
+          });
+
+          holdingsValueBn = cumulativeUnitsBn.multipliedBy(closeBn);
+          costBasisPerUnitBn = cumulativeUnitsBn.isZero()
+            ? new BigNumber(0)
+            : remainingCostBasisBn.dividedBy(cumulativeUnitsBn);
+          unrealizedProfitLossPercentageBn = remainingCostBasisBn.isZero()
+            ? new BigNumber(0)
+            : holdingsValueBn
+                .minus(remainingCostBasisBn)
+                .dividedBy(remainingCostBasisBn)
+                .multipliedBy(100);
+        }
+      }
+
+      const portfolioValueBn = cashBalanceBn.plus(holdingsValueBn);
+
       timeline.push({
         date,
         close: point.close,
@@ -224,7 +335,7 @@ export function runSingleAssetDcaBacktest(
   }
 
   const lastCloseBn = new BigNumber(lastPointInRange.close);
-  const currentValueBn = cumulativeUnitsBn.multipliedBy(lastCloseBn);
+  const currentValueBn = cashBalanceBn.plus(cumulativeUnitsBn.multipliedBy(lastCloseBn));
   const currentValue = bnToNumber(currentValueBn);
   const cumulativeInvested = bnToNumber(cumulativeInvestedBn);
 
@@ -478,7 +589,7 @@ export function runPortfolioDcaBacktest(
 
 @Injectable()
 export class CalculationService {
-  runSingleAssetDcaBacktest(prices: PricePoint[], params: RunDcaBacktestParams) {
+  runSingleAssetDcaBacktest(prices: PricePoint[], params: RunSingleAssetDcaBacktestParams) {
     return runSingleAssetDcaBacktest(prices, params);
   }
 
