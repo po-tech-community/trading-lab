@@ -165,7 +165,11 @@ export function StrategyConfigCard({
           className={cn("space-y-4 relative pt-0", isCollapsed && "hidden")}
         >
           <Form {...form}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4"
+              noValidate
+            >
               <fieldset disabled={isSubmitting} className="space-y-2">
                 <FormField
                   control={form.control}
@@ -326,12 +330,12 @@ export function StrategyConfigCard({
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 items-start">
                   <FormField
                     control={form.control}
                     name="startDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-2">
+                      <FormItem className="flex flex-col gap-1.5 space-y-0">
                         <FormLabel className="text-xs text-muted-foreground">
                           From
                         </FormLabel>
@@ -343,7 +347,9 @@ export function StrategyConfigCard({
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
+                        <div className="min-h-[2.75rem] text-xs leading-snug">
+                          <FormMessage />
+                        </div>
                       </FormItem>
                     )}
                   />
@@ -351,7 +357,7 @@ export function StrategyConfigCard({
                     control={form.control}
                     name="endDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-2">
+                      <FormItem className="flex flex-col gap-1.5 space-y-0">
                         <FormLabel className="text-xs text-muted-foreground">
                           To
                         </FormLabel>
@@ -363,7 +369,9 @@ export function StrategyConfigCard({
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
+                        <div className="min-h-[2.75rem] text-xs leading-snug">
+                          <FormMessage />
+                        </div>
                       </FormItem>
                     )}
                   />
@@ -376,8 +384,9 @@ export function StrategyConfigCard({
                     Smart triggers (optional)
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Configure take-profit and stop-loss for when the simulator
-                    supports them. Values are saved in the form only for now.
+                    Chart and summary stay the same for now — the API does not
+                    apply these settings yet (Level 3 backend). Values are kept
+                    in the form only until that ships.
                   </p>
 
                   <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-3">
@@ -402,12 +411,12 @@ export function StrategyConfigCard({
                       />
                     </div>
                     {takeProfitEnabled ? (
-                      <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3 pt-1 items-start">
                         <FormField
                           control={form.control}
                           name="takeProfitThreshold"
                           render={({ field }) => (
-                            <FormItem className="space-y-1.5">
+                            <FormItem className="flex flex-col gap-1.5 space-y-0">
                               <FormLabel className="text-xs text-muted-foreground">
                                 Threshold (% gain)
                               </FormLabel>
@@ -431,7 +440,9 @@ export function StrategyConfigCard({
                                   }}
                                 />
                               </FormControl>
-                              <FormMessage />
+                              <div className="min-h-[2.75rem] text-xs leading-snug">
+                                <FormMessage />
+                              </div>
                             </FormItem>
                           )}
                         />
@@ -439,7 +450,7 @@ export function StrategyConfigCard({
                           control={form.control}
                           name="takeProfitSellPercent"
                           render={({ field }) => (
-                            <FormItem className="space-y-1.5">
+                            <FormItem className="flex flex-col gap-1.5 space-y-0">
                               <FormLabel className="text-xs text-muted-foreground">
                                 Sell (% position)
                               </FormLabel>
@@ -464,7 +475,9 @@ export function StrategyConfigCard({
                                   }}
                                 />
                               </FormControl>
-                              <FormMessage />
+                              <div className="min-h-[2.75rem] text-xs leading-snug">
+                                <FormMessage />
+                              </div>
                             </FormItem>
                           )}
                         />
@@ -494,12 +507,12 @@ export function StrategyConfigCard({
                       />
                     </div>
                     {stopLossEnabled ? (
-                      <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3 pt-1 items-start">
                         <FormField
                           control={form.control}
                           name="stopLossThreshold"
                           render={({ field }) => (
-                            <FormItem className="space-y-1.5">
+                            <FormItem className="flex flex-col gap-1.5 space-y-0">
                               <FormLabel className="text-xs text-muted-foreground">
                                 Threshold (% drawdown)
                               </FormLabel>
@@ -524,7 +537,9 @@ export function StrategyConfigCard({
                                   }}
                                 />
                               </FormControl>
-                              <FormMessage />
+                              <div className="min-h-[2.75rem] text-xs leading-snug">
+                                <FormMessage />
+                              </div>
                             </FormItem>
                           )}
                         />
@@ -532,7 +547,7 @@ export function StrategyConfigCard({
                           control={form.control}
                           name="stopLossSellPercent"
                           render={({ field }) => (
-                            <FormItem className="space-y-1.5">
+                            <FormItem className="flex flex-col gap-1.5 space-y-0">
                               <FormLabel className="text-xs text-muted-foreground">
                                 Sell (% position)
                               </FormLabel>
@@ -557,7 +572,9 @@ export function StrategyConfigCard({
                                   }}
                                 />
                               </FormControl>
-                              <FormMessage />
+                              <div className="min-h-[2.75rem] text-xs leading-snug">
+                                <FormMessage />
+                              </div>
                             </FormItem>
                           )}
                         />
