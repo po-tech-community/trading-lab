@@ -57,9 +57,40 @@ export interface RunPortfolioBacktestRequestBody {
   endDate: number;
 }
 
+export interface PortfolioTimelineAssetSlice {
+  symbol: string;
+  units: number;
+  value: number;
+  invested: number;
+}
+
+export interface PortfolioBacktestTimelinePoint {
+  date: number;
+  portfolioValue: number;
+  cumulativeInvested: number;
+  assets: PortfolioTimelineAssetSlice[];
+}
+
+export interface PortfolioAssetBreakdown {
+  symbol: string;
+  weight: number;
+  totalUnits: number;
+  invested: number;
+  currentValue: number;
+  returnPercentage: number;
+}
+
+export interface PortfolioBacktestSummary {
+  totalInvested: number;
+  currentValue: number;
+  totalReturnPercentage: number;
+  numberOfPurchases: number;
+  assets: PortfolioAssetBreakdown[];
+}
+
 export interface RunPortfolioBacktestResponse {
-  summary: BacktestSummary;
-  timeline: BacktestTimelinePoint[];
+  summary: PortfolioBacktestSummary;
+  timeline: PortfolioBacktestTimelinePoint[];
 }
 
 export async function runPortfolioBacktest(

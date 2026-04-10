@@ -13,30 +13,43 @@
  */
  
 import { useState } from "react"
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PortfolioConfigCard } from "@/pages/portfolio-backtest/PortfolioConfigCard"
 import { runPortfolioBacktest } from "@/lib/backtest-api"
-import type { RunPortfolioBacktestRequestBody } from "@/lib/backtest-api"
+import type { RunPortfolioBacktestRequestBody, RunPortfolioBacktestResponse } from "@/lib/backtest-api"
+import { timelineToChartData } from "@/pages/dca-backtest/timeline-to-chart";
+import CompositionPieChart from "@/pages/portfolio-backtest/CompositionPieChart";
+import AssetBreakdown from "@/pages/portfolio-backtest/AssetBreakdown";
+import { SummaryStatsCards } from "@/pages/dca-backtest/SummaryStatsCards";
+import { PortfolioTrajectoryChart } from "@/pages/dca-backtest/PortfolioTrajectoryChart";
  
 export default function PortfolioPage() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
  
-  async function handleSubmit(body: RunPortfolioBacktestRequestBody) {
-    setIsSubmitting(true)
-    setSubmitError(null)
-    try {
-      // TODO (L2-FE-3): store result and render summary + chart
-      await runPortfolioBacktest(body)
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "An unexpected error occurred.")
-    } finally {
-      setIsSubmitting(false)
-    }
+  const mutation = useMutation({
+    mutationFn: runPortfolioBacktest,
+    onSuccess: (data) => {
+      setResult(data);
+      toast.success("Portfolio backtest completed");
+    },
+    onError: (err) => {
+      setSubmitError(err instanceof Error ? err.message : "An unexpected error occurred.");
+    },
+  });
+
+  function handleSubmit(body: RunPortfolioBacktestRequestBody) {
+    setSubmitError(null);
+    mutation.mutate(body);
   }
+
+  const chartData = result ? timelineToChartData(result.timeline) : [];
  
   return (
     <div className="space-y-6">
@@ -57,55 +70,45 @@ export default function PortfolioPage() {
           onCollapsedChange={setIsCollapsed}
         />
  
-        {/* ── Right: Results placeholder (to be replaced by L2-FE-3) ── */}
+        {/* ── Right: Results */}
         <div className="flex-1 space-y-4 min-w-0">
           <div className="grid gap-4 md:grid-cols-3">
+            <SummaryStatsCards
+              summary={result ? {
+                totalInvested: result.summary.totalInvested,
+                currentValue: result.summary.currentValue,
+                totalReturnPercentage: result.summary.totalReturnPercentage,
+                totalHoldings: result.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
+                numberOfPurchases: result.summary.numberOfPurchases,
+              } : null}
+            />
+            <CompositionPieChart assets={result ? result.summary.assets.map(a => ({ symbol: a.symbol, weight: a.weight })) : [{ symbol: '—', weight: 100 }]} />
+            <AssetBreakdown items={result ? result.summary.assets.map(a => ({ symbol: a.symbol, weight: a.weight, invested: a.invested, currentValue: a.currentValue, returnPercentage: a.returnPercentage })) : []} />
+          </div>
+
+          {chartData.length > 0 ? (
+            <PortfolioTrajectoryChart
+              data={chartData}
+              isFullscreen={false}
+              onFullscreenChange={() => {}}
+              chartDescription={`Portfolio performance (${chartData.length} points)`}
+              assetLabel="Portfolio"
+            />
+          ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Total value</CardTitle>
-                <CardDescription>Run a backtest to see results</CardDescription>
+                <CardTitle className="text-base">Portfolio trajectory</CardTitle>
+                <CardDescription>
+                  Chart will render here after running a backtest.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-semibold text-muted-foreground">—</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Total return</CardTitle>
-                <CardDescription>vs. total invested</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold text-muted-foreground">—</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Assets tracked</CardTitle>
-                <CardDescription>in this simulation</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-2xl font-semibold text-muted-foreground">—</p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">Configure left →</Badge>
+                <div className="flex items-center justify-center h-48 rounded-md border border-dashed text-muted-foreground text-sm">
+                  Configure assets on the left and click “Run portfolio backtest”
                 </div>
               </CardContent>
             </Card>
-          </div>
- 
-          {/* Chart placeholder */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Portfolio trajectory</CardTitle>
-              <CardDescription>
-                Chart will render here after running a backtest (L2-FE-3).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center h-48 rounded-md border border-dashed text-muted-foreground text-sm">
-                Configure assets on the left and click &ldquo;Run portfolio backtest&rdquo;
-              </div>
-            </CardContent>
-          </Card>
+          )}
         </div>
       </div>
     </div>
