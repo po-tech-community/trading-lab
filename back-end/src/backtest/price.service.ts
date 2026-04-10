@@ -113,7 +113,7 @@ export class PriceService {
    * 2. Build URL with coin ID (e.g. 'bitcoin'), from/to, send API key in header
    * 3. Handle rate limit (429) and other HTTP errors
    * 4. Parse response: CoinGecko returns [[timestamp_ms, price], ...]
-   * 5. Deduplicate — keep only one entry per day (CoinGecko may return multiple)
+   * 5. Deduplicate — one entry per UTC day; use the **last** intraday sample as daily close proxy
    * 6. Store each day as UTC midnight epoch ms for consistency
    * 7. Return array of { date: epoch_ms, close }
    */
@@ -205,19 +205,22 @@ export class PriceService {
       );
     }
 
-    // Convert to { date, close } — keep only one entry per day
-    const seen = new Set<string>();
-    const result: PricePoint[] = [];
-
+    // One row per UTC day: keep the latest timestamp that day (end-of-day proxy vs first tick).
+    const bestByDay = new Map<string, { ts: number; price: number }>();
     for (const [timestampMs, price] of data.prices) {
       const dayKey = epochMsToDateString(timestampMs);
-      if (!seen.has(dayKey)) {
-        seen.add(dayKey);
-        result.push({ date: dateStringToEpochMs(dayKey), close: price });
+      const prev = bestByDay.get(dayKey);
+      if (!prev || timestampMs >= prev.ts) {
+        bestByDay.set(dayKey, { ts: timestampMs, price });
       }
     }
 
-    return result;
+    return Array.from(bestByDay.entries())
+      .map(([dayKey, { price }]) => ({
+        date: dateStringToEpochMs(dayKey),
+        close: price,
+      }))
+      .sort((a, b) => a.date - b.date);
   }
 
   // ---------------------------------------------------------------------------
@@ -228,7 +231,7 @@ export class PriceService {
    *
    * Flow:
    * 1. Check API key is configured in .env
-   * 2. Call TIME_SERIES_DAILY with outputsize=compact (last 100 trading days, free tier)
+   * 2. Call TIME_SERIES_DAILY — `compact` when short ranges; `full` when calendar span > 100 days
    * 3. Handle rate limit — AlphaVantage returns 200 with an 'Information' or 'Note'
    *    field when limited instead of using HTTP 429, so must check manually
    * 4. Parse 'Time Series (Daily)' object: keys are YYYY-MM-DD strings, values contain OHLC
@@ -250,9 +253,14 @@ export class PriceService {
       );
     }
 
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${apiKey}`;
+    // `compact` ≈ last 100 trading days; longer ranges need `full` or filtered data is incomplete.
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const calendarDays = Math.ceil((endDate - startDate) / MS_PER_DAY);
+    const outputsize = calendarDays > 100 ? 'full' : 'compact';
+
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=${outputsize}&apikey=${apiKey}`;
     this.logger.log(
-      `Fetching AlphaVantage prices for ${symbol} from ${startDate} to ${endDate}`,
+      `Fetching AlphaVantage (${outputsize}) for ${symbol} from ${startDate} to ${endDate}`,
     );
 
     let data: any;
