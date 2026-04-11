@@ -65,4 +65,84 @@ describe('RunDcaBacktestDto', () => {
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'endDate')).toBe(true);
   });
+
+  it('passes with valid triggers', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: {
+        takeProfit: { threshold: 50, sellAction: 100 },
+        stopLoss: { threshold: 15, sellAction: 50 },
+      },
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('passes when triggers are omitted', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects trigger threshold of 0', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: { takeProfit: { threshold: 0, sellAction: 100 } },
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects negative trigger threshold', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: { stopLoss: { threshold: -10, sellAction: 50 } },
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects sellAction of 0', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: { takeProfit: { threshold: 50, sellAction: 0 } },
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects sellAction above 100', async () => {
+    const dto = plainToInstance(RunDcaBacktestDto, {
+      symbol: 'BTC',
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers: { takeProfit: { threshold: 50, sellAction: 101 } },
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });
