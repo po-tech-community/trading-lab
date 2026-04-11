@@ -17,7 +17,6 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { PortfolioConfigCard } from "@/pages/portfolio-backtest/PortfolioConfigCard"
 import { runPortfolioBacktest } from "@/lib/backtest-api"
 import type { RunPortfolioBacktestRequestBody, RunPortfolioBacktestResponse } from "@/lib/backtest-api"
@@ -29,7 +28,6 @@ import { PortfolioTrajectoryChart } from "@/pages/dca-backtest/PortfolioTrajecto
  
 export default function PortfolioPage() {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
  
@@ -64,7 +62,7 @@ export default function PortfolioPage() {
         {/* ── Left: Portfolio config with AssetList (L2-FE-1) ── */}
         <PortfolioConfigCard
           onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
+          isSubmitting={mutation.isPending}
           submitError={submitError}
           isCollapsed={isCollapsed}
           onCollapsedChange={setIsCollapsed}
@@ -80,6 +78,8 @@ export default function PortfolioPage() {
                 totalReturnPercentage: result.summary.totalReturnPercentage,
                 totalHoldings: result.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
                 numberOfPurchases: result.summary.numberOfPurchases,
+                realizedProfit: 0, // TODO: implement for portfolio
+                unrealizedValue: result.summary.currentValue, // TODO: implement for portfolio
               } : null}
             />
             <CompositionPieChart assets={result ? result.summary.assets.map(a => ({ symbol: a.symbol, weight: a.weight })) : [{ symbol: '—', weight: 100 }]} />

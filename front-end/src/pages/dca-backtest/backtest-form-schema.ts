@@ -128,12 +128,26 @@ export type BacktestFormValues = z.infer<typeof backtestFormSchema>;
 export function backtestFormValuesToRequest(
   values: BacktestFormValues,
 ): RunBacktestRequestBody {
+  const triggers: RunBacktestRequestBody['triggers'] = {};
+  if (values.takeProfitEnabled) {
+    triggers.takeProfit = {
+      threshold: values.takeProfitThreshold,
+      sellAction: values.takeProfitSellPercent,
+    };
+  }
+  if (values.stopLossEnabled) {
+    triggers.stopLoss = {
+      threshold: values.stopLossThreshold,
+      sellAction: values.stopLossSellPercent,
+    };
+  }
+
   return {
     symbol: values.symbol,
     amount: values.amount,
     frequency: values.frequency,
     startDate: Date.parse(`${values.startDate}T00:00:00.000Z`),
     endDate: Date.parse(`${values.endDate}T00:00:00.000Z`),
-    // `triggers` reserved for L3-BE-4 — omit from payload so ValidationPipe does not reject.
+    triggers: Object.keys(triggers).length > 0 ? triggers : undefined,
   };
 }

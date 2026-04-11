@@ -8,6 +8,10 @@ export interface RunBacktestRequestBody {
   frequency: DcaFrequency;
   startDate: number;
   endDate: number;
+  triggers?: {
+    takeProfit?: { threshold: number; sellAction: number };
+    stopLoss?: { threshold: number; sellAction: number };
+  };
 }
 
 export interface BacktestSummary {
@@ -16,6 +20,8 @@ export interface BacktestSummary {
   totalReturnPercentage: number;
   totalHoldings: number;
   numberOfPurchases: number;
+  realizedProfit: number;
+  unrealizedValue: number;
 }
 
 export interface BacktestTimelinePoint {
@@ -27,9 +33,19 @@ export interface BacktestTimelinePoint {
   portfolioValue: number;
 }
 
+export interface BacktestTrade {
+  date: number;
+  type: 'takeProfit' | 'stopLoss';
+  price: number;
+  units: number;
+  profit: number;
+  sellAction: number;
+}
+
 export interface RunBacktestResponse {
   summary: BacktestSummary;
   timeline: BacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 export async function runBacktest(

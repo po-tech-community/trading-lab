@@ -30,7 +30,7 @@ export default function CompositionPieChart({
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => `${v}%`} />
+            <Tooltip formatter={(v) => v !== undefined ? `${v}%` : '—'} />
             <Legend verticalAlign="bottom" height={36} />
           </PieChart>
         </ResponsiveContainer>
