@@ -39,8 +39,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -52,6 +50,7 @@ import {
 } from "./backtest-form-schema";
 import type { RunBacktestRequestBody } from "@/lib/backtest-api";
 import { toast } from "sonner";
+import { TriggerConfigSection } from "./TriggerConfigSection";
 
 export interface StrategyConfigCardProps {
   /** Called with validated payload (epoch ms dates). */
@@ -82,6 +81,8 @@ export function StrategyConfigCard({
 
   const form = useForm<BacktestFormValues>({
     resolver: zodResolver(backtestFormSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       symbol: "BTC",
       amount: 100,
@@ -104,6 +105,22 @@ export function StrategyConfigCard({
   useEffect(() => {
     onSymbolChange?.(selectedSymbol);
   }, [onSymbolChange, selectedSymbol]);
+
+  useEffect(() => {
+    if (takeProfitEnabled) {
+      void form.trigger(["takeProfitThreshold", "takeProfitSellPercent"]);
+      return;
+    }
+    form.clearErrors(["takeProfitThreshold", "takeProfitSellPercent"]);
+  }, [form, takeProfitEnabled]);
+
+  useEffect(() => {
+    if (stopLossEnabled) {
+      void form.trigger(["stopLossThreshold", "stopLossSellPercent"]);
+      return;
+    }
+    form.clearErrors(["stopLossThreshold", "stopLossSellPercent"]);
+  }, [form, stopLossEnabled]);
 
   const handleSubmit = form.handleSubmit(
     (values) => {
@@ -165,11 +182,7 @@ export function StrategyConfigCard({
           className={cn("space-y-4 relative pt-0", isCollapsed && "hidden")}
         >
           <Form {...form}>
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4"
-              noValidate
-            >
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <fieldset disabled={isSubmitting} className="space-y-2">
                 <FormField
                   control={form.control}
@@ -347,7 +360,7 @@ export function StrategyConfigCard({
                             {...field}
                           />
                         </FormControl>
-                        <div className="min-h-[2.75rem] text-xs leading-snug">
+                        <div className="text-xs leading-snug">
                           <FormMessage />
                         </div>
                       </FormItem>
@@ -369,7 +382,7 @@ export function StrategyConfigCard({
                             {...field}
                           />
                         </FormControl>
-                        <div className="min-h-[2.75rem] text-xs leading-snug">
+                        <div className="text-xs leading-snug">
                           <FormMessage />
                         </div>
                       </FormItem>
@@ -377,217 +390,57 @@ export function StrategyConfigCard({
                   />
                 </div>
 
-                <Separator className="bg-border/80" />
-
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Smart triggers (optional)
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Chart and summary stay the same for now — the API does not
-                    apply these settings yet (Level 3 backend). Values are kept
-                    in the form only until that ships.
-                  </p>
-
-                  <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <TrendingUp className="size-4 text-emerald-600 shrink-0" />
-                        <span className="text-sm font-medium">Take profit</span>
-                      </div>
-                      <FormField
-                        control={form.control}
-                        name="takeProfitEnabled"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    {takeProfitEnabled ? (
-                      <div className="grid grid-cols-2 gap-3 pt-1 items-start">
-                        <FormField
-                          control={form.control}
-                          name="takeProfitThreshold"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col gap-1.5 space-y-0">
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Threshold (% gain)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min={0.1}
-                                  className="h-9"
-                                  name={field.name}
-                                  ref={field.ref}
-                                  onBlur={field.onBlur}
-                                  value={
-                                    Number.isFinite(field.value)
-                                      ? field.value
-                                      : ""
-                                  }
-                                  onChange={(e) => {
-                                    const n = e.target.valueAsNumber;
-                                    field.onChange(Number.isNaN(n) ? 0 : n);
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="min-h-[2.75rem] text-xs leading-snug">
-                                <FormMessage />
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="takeProfitSellPercent"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col gap-1.5 space-y-0">
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Sell (% position)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="1"
-                                  min={1}
-                                  max={100}
-                                  className="h-9"
-                                  name={field.name}
-                                  ref={field.ref}
-                                  onBlur={field.onBlur}
-                                  value={
-                                    Number.isFinite(field.value)
-                                      ? field.value
-                                      : ""
-                                  }
-                                  onChange={(e) => {
-                                    const n = e.target.valueAsNumber;
-                                    field.onChange(Number.isNaN(n) ? 0 : n);
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="min-h-[2.75rem] text-xs leading-snug">
-                                <FormMessage />
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <TrendingDown className="size-4 text-rose-600 shrink-0" />
-                        <span className="text-sm font-medium">Stop loss</span>
-                      </div>
-                      <FormField
-                        control={form.control}
-                        name="stopLossEnabled"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center gap-2 space-y-0">
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    {stopLossEnabled ? (
-                      <div className="grid grid-cols-2 gap-3 pt-1 items-start">
-                        <FormField
-                          control={form.control}
-                          name="stopLossThreshold"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col gap-1.5 space-y-0">
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Threshold (% drawdown)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min={0.1}
-                                  max={100}
-                                  className="h-9"
-                                  name={field.name}
-                                  ref={field.ref}
-                                  onBlur={field.onBlur}
-                                  value={
-                                    Number.isFinite(field.value)
-                                      ? field.value
-                                      : ""
-                                  }
-                                  onChange={(e) => {
-                                    const n = e.target.valueAsNumber;
-                                    field.onChange(Number.isNaN(n) ? 0 : n);
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="min-h-[2.75rem] text-xs leading-snug">
-                                <FormMessage />
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="stopLossSellPercent"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col gap-1.5 space-y-0">
-                              <FormLabel className="text-xs text-muted-foreground">
-                                Sell (% position)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="1"
-                                  min={1}
-                                  max={100}
-                                  className="h-9"
-                                  name={field.name}
-                                  ref={field.ref}
-                                  onBlur={field.onBlur}
-                                  value={
-                                    Number.isFinite(field.value)
-                                      ? field.value
-                                      : ""
-                                  }
-                                  onChange={(e) => {
-                                    const n = e.target.valueAsNumber;
-                                    field.onChange(Number.isNaN(n) ? 0 : n);
-                                  }}
-                                />
-                              </FormControl>
-                              <div className="min-h-[2.75rem] text-xs leading-snug">
-                                <FormMessage />
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
                 <p className="text-xs text-amber-600" role="note">
                   Default range is set to From = 1 year ago and To = today. You
                   can change it, but the selected range must stay within 365
                   days.
                 </p>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Smart triggers (optional)
+                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[240px]">
+                        Enable take profit and/or stop loss to simulate
+                        automatic sell actions. Matching trades will appear in
+                        Trade History after running the backtest.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  <TriggerConfigSection
+                    control={form.control}
+                    enabledName="takeProfitEnabled"
+                    enabled={takeProfitEnabled}
+                    title="Take profit"
+                    icon={
+                      <TrendingUp className="size-4 text-emerald-600 shrink-0" />
+                    }
+                    thresholdName="takeProfitThreshold"
+                    thresholdLabel="Threshold (% gain)"
+                    thresholdMax={1000}
+                    sellPercentName="takeProfitSellPercent"
+                  />
+
+                  <TriggerConfigSection
+                    control={form.control}
+                    enabledName="stopLossEnabled"
+                    enabled={stopLossEnabled}
+                    title="Stop loss"
+                    icon={
+                      <TrendingDown className="size-4 text-rose-600 shrink-0" />
+                    }
+                    thresholdName="stopLossThreshold"
+                    thresholdLabel="Threshold (% drawdown)"
+                    thresholdMax={100}
+                    sellPercentName="stopLossSellPercent"
+                  />
+                </div>
 
                 {submitError ? (
                   <p className="text-sm text-destructive" role="alert">

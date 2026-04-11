@@ -18,7 +18,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { StrategyConfigCard } from "./dca-backtest/StrategyConfigCard";
 import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards";
-import { StrategyPresetsCard } from "./dca-backtest/StrategyPresetsCard";
 import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart";
 import { timelineToChartData } from "./dca-backtest/timeline-to-chart";
 import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
@@ -115,12 +114,11 @@ export default function DcaBacktestPage() {
           <div className="flex-1 flex flex-col gap-4 w-full overflow-hidden">
             <SummaryStatsCards summary={backtestResult?.summary ?? null} />
 
-            <StrategyPresetsCard />
-
             {chartData.length > 0 ? (
               <>
                 <PortfolioTrajectoryChart
                   data={chartData}
+                  trades={backtestResult?.trades ?? []}
                   isFullscreen={isFullscreen}
                   onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
                   chartDescription={chartDescription}

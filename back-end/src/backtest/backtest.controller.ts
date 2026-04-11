@@ -32,7 +32,7 @@ export class BacktestController {
   @Post('run')
   @ApiBody({ type: RunDcaBacktestDto })
   async run(@Body() body: RunDcaBacktestDto) {
-    const { symbol, amount, frequency, startDate, endDate } = body;
+    const { symbol, amount, frequency, startDate, endDate, triggers } = body;
     const prices = await this.priceService.fetchPrices(
       symbol,
       startDate,
@@ -43,6 +43,7 @@ export class BacktestController {
       frequency,
       startDate,
       endDate,
+      triggers,
     });
   }
 

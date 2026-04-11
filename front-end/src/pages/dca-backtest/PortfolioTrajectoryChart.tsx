@@ -6,7 +6,9 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  ReferenceDot,
 } from "recharts";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -19,10 +21,13 @@ import { Minimize2, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChartTooltip } from "./ChartTooltip";
 import type { ChartDataPoint } from "./constants";
+import type { BacktestTrade } from "@/lib/backtest-api";
 
 export interface PortfolioTrajectoryChartProps {
   /** Time-series data: date, invested, value */
   data: ChartDataPoint[];
+  /** Sell trades from smart triggers used for marker rendering */
+  trades?: BacktestTrade[];
   /** Whether the chart is in fullscreen mode */
   isFullscreen: boolean;
   /** Toggle fullscreen */
@@ -39,11 +44,14 @@ export interface PortfolioTrajectoryChartProps {
  */
 export function PortfolioTrajectoryChart({
   data,
+  trades = [],
   isFullscreen,
   onFullscreenChange,
   chartDescription = "Performance visualization",
   assetLabel = "Coin",
 }: PortfolioTrajectoryChartProps) {
+  const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+
   const expandedData = data.flatMap((point, index) => {
     if (index === data.length - 1) return [point];
 
@@ -100,6 +108,29 @@ export function PortfolioTrajectoryChart({
     };
   });
 
+  const valueByDay = new Map<string, number>();
+  for (const point of data) {
+    valueByDay.set(point.date, point.value);
+  }
+
+  const tradeMarkers = trades
+    .map((trade) => {
+      const date = new Date(trade.date).toISOString().slice(0, 10);
+      const value = valueByDay.get(date);
+      if (value === undefined) return null;
+
+      return {
+        id: `${trade.type}-${trade.date}-${trade.units}`,
+        date,
+        value,
+        type: trade.type,
+        units: trade.units,
+        profit: trade.profit,
+        price: trade.price,
+      };
+    })
+    .filter((marker): marker is NonNullable<typeof marker> => marker !== null);
+
   return (
     <Card
       className={cn(
@@ -128,6 +159,14 @@ export function PortfolioTrajectoryChart({
               <span className="text-xs text-muted-foreground">
                 Total invested
               </span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="text-xs text-muted-foreground">TP sell</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="h-2 w-2 rounded-full bg-rose-500" />
+              <span className="text-xs text-muted-foreground">SL sell</span>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onFullscreenChange}>
@@ -264,6 +303,79 @@ export function PortfolioTrajectoryChart({
               opacity={0.4}
               dot={false}
             />
+            {tradeMarkers.map((marker) => (
+              <ReferenceDot
+                key={marker.id}
+                x={marker.date}
+                y={marker.value}
+                r={hoveredMarkerId === marker.id ? 7 : 5}
+                fill={
+                  marker.type === "takeProfit"
+                    ? "rgb(16 185 129)"
+                    : "rgb(244 63 94)"
+                }
+                stroke={
+                  hoveredMarkerId === marker.id
+                    ? "hsl(var(--foreground))"
+                    : "hsl(var(--background))"
+                }
+                strokeWidth={hoveredMarkerId === marker.id ? 2.5 : 2}
+                ifOverflow="hidden"
+                onMouseEnter={() => setHoveredMarkerId(marker.id)}
+                onMouseLeave={() => setHoveredMarkerId(null)}
+                shape={(props: { cx?: number; cy?: number }) => {
+                  const cx = props.cx ?? 0;
+                  const cy = props.cy ?? 0;
+                  const isHovered = hoveredMarkerId === marker.id;
+                  const markerLabel =
+                    `${marker.type === "takeProfit" ? "TP" : "SL"} trigger\n` +
+                    `Date: ${marker.date}\n` +
+                    `Price: $${marker.price.toFixed(2)}\n` +
+                    `Amount sold: ${marker.units.toFixed(6)}\n` +
+                    `Realized profit: ${marker.profit >= 0 ? "+" : ""}$${marker.profit.toFixed(2)}`;
+
+                  return (
+                    <g>
+                      <text
+                        x={cx}
+                        y={cy - 10}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fontWeight={700}
+                        fill={
+                          marker.type === "takeProfit"
+                            ? "rgb(16 185 129)"
+                            : "rgb(244 63 94)"
+                        }
+                        style={{ pointerEvents: "none" }}
+                      >
+                        $
+                      </text>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={isHovered ? 7 : 5}
+                        fill={
+                          marker.type === "takeProfit"
+                            ? "rgb(16 185 129)"
+                            : "rgb(244 63 94)"
+                        }
+                        stroke={
+                          isHovered
+                            ? "hsl(var(--foreground))"
+                            : "hsl(var(--background))"
+                        }
+                        strokeWidth={isHovered ? 2.5 : 2}
+                        onMouseEnter={() => setHoveredMarkerId(marker.id)}
+                        onMouseLeave={() => setHoveredMarkerId(null)}
+                      >
+                        <title>{markerLabel}</title>
+                      </circle>
+                    </g>
+                  );
+                }}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </CardContent>
