@@ -48,11 +48,14 @@ export interface BacktestSummary {
   totalReturnPercentage: number;
   totalHoldings: number;
   numberOfPurchases: number;
+  realizedProfit: number;
+  unrealizedValue: number;
 }
 
 export interface RunDcaBacktestResult {
   summary: BacktestSummary;
   timeline: BacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 /** One row in the portfolio builder; `weight` is a percentage (e.g. 60 = 60%). Sum must be 100. */
@@ -335,9 +338,13 @@ export function runSingleAssetDcaBacktest(
   }
 
   const lastCloseBn = new BigNumber(lastPointInRange.close);
-  const currentValueBn = cashBalanceBn.plus(cumulativeUnitsBn.multipliedBy(lastCloseBn));
+  const holdingsValueBn = cumulativeUnitsBn.multipliedBy(lastCloseBn);
+  const currentValueBn = cashBalanceBn.plus(holdingsValueBn);
   const currentValue = bnToNumber(currentValueBn);
   const cumulativeInvested = bnToNumber(cumulativeInvestedBn);
+
+  const realizedProfit = trades.reduce((sum, trade) => sum + trade.profit, 0);
+  const unrealizedValue = bnToNumber(holdingsValueBn);
 
   const totalReturnPercentage = cumulativeInvestedBn.isZero()
     ? 0
@@ -352,8 +359,11 @@ export function runSingleAssetDcaBacktest(
       totalReturnPercentage,
       totalHoldings: bnToNumber(cumulativeUnitsBn),
       numberOfPurchases,
+      realizedProfit,
+      unrealizedValue,
     },
     timeline,
+    trades,
   };
 }
 

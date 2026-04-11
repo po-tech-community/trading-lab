@@ -11,6 +11,10 @@ export interface RunDcaBacktestParams {
   frequency: DcaFrequency;
   startDate: number;
   endDate: number;
+  triggers?: {
+    takeProfit?: { threshold: number; sellAction: number };
+    stopLoss?: { threshold: number; sellAction: number };
+  };
 }
 
 export class RunDcaBacktestDto implements RunDcaBacktestParams {
@@ -56,4 +60,17 @@ export class RunDcaBacktestDto implements RunDcaBacktestParams {
   @IsInt()
   @Validate(IsEndAfterStartConstraint)
   endDate: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Optional take profit and stop loss triggers',
+    example: {
+      takeProfit: { threshold: 50, sellAction: 100 },
+      stopLoss: { threshold: 15, sellAction: 50 }
+    }
+  })
+  triggers?: {
+    takeProfit?: { threshold: number; sellAction: number };
+    stopLoss?: { threshold: number; sellAction: number };
+  };
 }

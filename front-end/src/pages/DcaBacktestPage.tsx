@@ -21,6 +21,7 @@ import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards";
 import { StrategyPresetsCard } from "./dca-backtest/StrategyPresetsCard";
 import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart";
 import { timelineToChartData } from "./dca-backtest/timeline-to-chart";
+import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
 
 function formatApiError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -117,13 +118,16 @@ export default function DcaBacktestPage() {
             <StrategyPresetsCard />
 
             {chartData.length > 0 ? (
-              <PortfolioTrajectoryChart
-                data={chartData}
-                isFullscreen={isFullscreen}
-                onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
-                chartDescription={chartDescription}
-                assetLabel={assetLabelMap[selectedSymbol]}
-              />
+              <>
+                <PortfolioTrajectoryChart
+                  data={chartData}
+                  isFullscreen={isFullscreen}
+                  onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
+                  chartDescription={chartDescription}
+                  assetLabel={assetLabelMap[selectedSymbol]}
+                />
+                <TradeHistoryTable trades={backtestResult?.trades ?? []} />
+              </>
             ) : (
               <Card
                 className={cn(
