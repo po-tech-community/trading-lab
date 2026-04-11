@@ -34,10 +34,16 @@ describe('runSingleAssetDcaBacktest', () => {
     expect(result.summary.totalReturnPercentage).toBeCloseTo(58.333333, 5);
     expect(result.timeline[0].costBasisPerUnit).toBeCloseTo(10, 10);
     expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
-    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(
+      0,
+      10,
+    );
     expect(result.timeline[2].costBasisPerUnit).toBeCloseTo(300 / 19, 10);
     expect(result.timeline[2].currentValue).toBeCloseTo(475, 10);
-    expect(result.timeline[2].unrealizedProfitLossPercentage).toBeCloseTo(58.333333, 5);
+    expect(result.timeline[2].unrealizedProfitLossPercentage).toBeCloseTo(
+      58.333333,
+      5,
+    );
   });
 
   it('handles weekly schedule when some calendar days have no prices', () => {
@@ -175,10 +181,16 @@ describe('runPortfolioDcaBacktest', () => {
     expect(result.timeline[1].portfolioValue).toBeCloseTo(300, 5);
     expect(result.timeline[0].costBasisTotal).toBeCloseTo(100, 10);
     expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
-    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(
+      0,
+      10,
+    );
     expect(result.timeline[1].costBasisTotal).toBeCloseTo(200, 10);
     expect(result.timeline[1].currentValue).toBeCloseTo(300, 10);
-    expect(result.timeline[1].unrealizedProfitLossPercentage).toBeCloseTo(50, 10);
+    expect(result.timeline[1].unrealizedProfitLossPercentage).toBeCloseTo(
+      50,
+      10,
+    );
   });
 
   it('throws when weights do not sum to 100', () => {
@@ -218,8 +230,152 @@ describe('runPortfolioDcaBacktest', () => {
         endDate: day('2025-01-03'),
       },
     );
-    expect(portfolio.summary.totalInvested).toBeCloseTo(single.summary.totalInvested, 8);
-    expect(portfolio.summary.currentValue).toBeCloseTo(single.summary.currentValue, 8);
-    expect(portfolio.summary.numberOfPurchases).toBe(single.summary.numberOfPurchases);
+    expect(portfolio.summary.totalInvested).toBeCloseTo(
+      single.summary.totalInvested,
+      8,
+    );
+    expect(portfolio.summary.currentValue).toBeCloseTo(
+      single.summary.currentValue,
+      8,
+    );
+    expect(portfolio.summary.numberOfPurchases).toBe(
+      single.summary.numberOfPurchases,
+    );
+  });
+
+  it('returns realizedProfit=0, unrealizedValue, and empty trades when no triggers', () => {
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 20 },
+    ];
+    const result = runPortfolioDcaBacktest(
+      { BTC: prices },
+      {
+        assets: [{ symbol: 'BTC', weight: 100 }],
+        totalAmount: 100,
+        frequency: 'daily',
+        startDate: day('2025-01-01'),
+        endDate: day('2025-01-02'),
+      },
+    );
+    expect(result.trades).toEqual([]);
+    expect(result.summary.realizedProfit).toBe(0);
+    expect(result.summary.unrealizedValue).toBeCloseTo(
+      result.summary.currentValue,
+      8,
+    );
+  });
+
+  it('executes portfolio take-profit trigger and records trade', () => {
+    // Both assets double in price on day 2 -> 100% gain exceeds 50% threshold
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 20 },
+    ];
+    const result = runPortfolioDcaBacktest(
+      { BTC: prices, ETH: prices.map((p) => ({ ...p })) },
+      {
+        assets: [
+          { symbol: 'BTC', weight: 50 },
+          { symbol: 'ETH', weight: 50 },
+        ],
+        totalAmount: 100,
+        frequency: 'daily',
+        startDate: day('2025-01-01'),
+        endDate: day('2025-01-02'),
+        triggers: { takeProfit: { threshold: 50, sellAction: 50 } },
+      },
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].type).toBe('takeProfit');
+    expect(result.trades[0].sellAction).toBe(50);
+    expect(result.summary.realizedProfit).toBeGreaterThan(0);
+    // After selling 50% of holdings, unrealized value should be less than total current value
+    expect(result.summary.unrealizedValue).toBeLessThan(
+      result.summary.currentValue,
+    );
+  });
+
+  it('executes portfolio stop-loss trigger and sells all holdings', () => {
+    // Price drops from 10 to 4 -> -60% loss exceeds 20% threshold
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 4 },
+    ];
+    const result = runPortfolioDcaBacktest(
+      { BTC: prices },
+      {
+        assets: [{ symbol: 'BTC', weight: 100 }],
+        totalAmount: 100,
+        frequency: 'daily',
+        startDate: day('2025-01-01'),
+        endDate: day('2025-01-02'),
+        triggers: { stopLoss: { threshold: 20, sellAction: 100 } },
+      },
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].type).toBe('stopLoss');
+    expect(result.summary.unrealizedValue).toBeCloseTo(0, 8);
+    // currentValue should be the cash from sells + any remaining holdings (0)
+    expect(result.summary.currentValue).toBeGreaterThan(0);
+  });
+
+  it('rejects invalid trigger threshold', () => {
+    const prices: PricePoint[] = [{ date: day('2025-01-01'), close: 10 }];
+    expect(() =>
+      runPortfolioDcaBacktest(
+        { BTC: prices },
+        {
+          assets: [{ symbol: 'BTC', weight: 100 }],
+          totalAmount: 100,
+          frequency: 'daily',
+          startDate: day('2025-01-01'),
+          endDate: day('2025-01-01'),
+          triggers: { takeProfit: { threshold: 0, sellAction: 50 } },
+        },
+      ),
+    ).toThrow(BadRequestException);
+  });
+
+  it('matches single-asset with triggers when 100% allocated to one symbol', () => {
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 20 },
+      { date: day('2025-01-03'), close: 25 },
+    ];
+    const triggers = { takeProfit: { threshold: 50, sellAction: 50 } };
+    const single = runSingleAssetDcaBacktest(prices, {
+      amount: 100,
+      frequency: 'daily',
+      startDate: day('2025-01-01'),
+      endDate: day('2025-01-03'),
+      triggers,
+    });
+    const portfolio = runPortfolioDcaBacktest(
+      { BTC: prices },
+      {
+        assets: [{ symbol: 'BTC', weight: 100 }],
+        totalAmount: 100,
+        frequency: 'daily',
+        startDate: day('2025-01-01'),
+        endDate: day('2025-01-03'),
+        triggers,
+      },
+    );
+    expect(portfolio.summary.realizedProfit).toBeCloseTo(
+      single.summary.realizedProfit,
+      8,
+    );
+    expect(portfolio.summary.unrealizedValue).toBeCloseTo(
+      single.summary.unrealizedValue,
+      8,
+    );
+    expect(portfolio.summary.currentValue).toBeCloseTo(
+      single.summary.currentValue,
+      8,
+    );
+    expect(portfolio.trades).toHaveLength(single.trades.length);
   });
 });

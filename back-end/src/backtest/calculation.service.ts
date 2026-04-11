@@ -33,7 +33,7 @@ export interface BacktestTimelinePoint {
   unrealizedProfitLossPercentage: number;
 }
 
-interface BacktestTrade {
+export interface BacktestTrade {
   date: number;
   type: 'takeProfit' | 'stopLoss';
   price: number;
@@ -71,6 +71,7 @@ export interface RunPortfolioDcaBacktestParams {
   frequency: DcaFrequency;
   startDate: number;
   endDate: number;
+  triggers?: BacktestTriggersParams;
 }
 
 export interface PortfolioAssetBreakdown {
@@ -104,12 +105,15 @@ export interface PortfolioBacktestSummary {
   currentValue: number;
   totalReturnPercentage: number;
   numberOfPurchases: number;
+  realizedProfit: number;
+  unrealizedValue: number;
   assets: PortfolioAssetBreakdown[];
 }
 
 export interface RunPortfolioDcaBacktestResult {
   summary: PortfolioBacktestSummary;
   timeline: PortfolioBacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 function toUtcMidnightEpochMs(epochMs: number): number {
@@ -133,13 +137,18 @@ function addMonthsUtcClamped(epochMs: number, months: number): number {
   const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
 
   // clamp day to last day of target month
-  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const lastDay = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0),
+  ).getUTCDate();
   const clampedDay = Math.min(day, lastDay);
 
   return Date.UTC(targetYear, targetMonth, clampedDay);
 }
 
-function nextBuyDateEpochMs(currentBuyDate: number, frequency: DcaFrequency): number {
+function nextBuyDateEpochMs(
+  currentBuyDate: number,
+  frequency: DcaFrequency,
+): number {
   switch (frequency) {
     case 'daily':
       return addDaysUtc(currentBuyDate, 1);
@@ -164,8 +173,14 @@ function validateTriggerConfig(
     throw new BadRequestException(`${label}.threshold must be greater than 0.`);
   }
 
-  if (!isFiniteNumber(trigger.sellAction) || trigger.sellAction <= 0 || trigger.sellAction > 100) {
-    throw new BadRequestException(`${label}.sellAction must be greater than 0 and at most 100.`);
+  if (
+    !isFiniteNumber(trigger.sellAction) ||
+    trigger.sellAction <= 0 ||
+    trigger.sellAction > 100
+  ) {
+    throw new BadRequestException(
+      `${label}.sellAction must be greater than 0 and at most 100.`,
+    );
   }
 }
 
@@ -175,14 +190,22 @@ function determineTriggeredTradeType(
 ): 'takeProfit' | 'stopLoss' | null {
   if (triggers?.takeProfit) {
     const takeProfitThresholdBn = new BigNumber(triggers.takeProfit.threshold);
-    if (unrealizedProfitLossPercentageBn.isGreaterThanOrEqualTo(takeProfitThresholdBn)) {
+    if (
+      unrealizedProfitLossPercentageBn.isGreaterThanOrEqualTo(
+        takeProfitThresholdBn,
+      )
+    ) {
       return 'takeProfit';
     }
   }
 
   if (triggers?.stopLoss) {
     const stopLossThresholdBn = new BigNumber(triggers.stopLoss.threshold);
-    if (unrealizedProfitLossPercentageBn.isLessThanOrEqualTo(stopLossThresholdBn.negated())) {
+    if (
+      unrealizedProfitLossPercentageBn.isLessThanOrEqualTo(
+        stopLossThresholdBn.negated(),
+      )
+    ) {
       return 'stopLoss';
     }
   }
@@ -208,7 +231,9 @@ export function runSingleAssetDcaBacktest(
   const { amount, frequency, triggers } = params;
 
   if (!isFiniteNumber(params.startDate) || !isFiniteNumber(params.endDate)) {
-    throw new BadRequestException('startDate and endDate must be epoch milliseconds.');
+    throw new BadRequestException(
+      'startDate and endDate must be epoch milliseconds.',
+    );
   }
 
   const startDate = toUtcMidnightEpochMs(params.startDate);
@@ -271,10 +296,13 @@ export function runSingleAssetDcaBacktest(
       if (triggeredTradeType) {
         const triggerConfig = triggers?.[triggeredTradeType];
         if (triggerConfig && cumulativeUnitsBn.isGreaterThan(0)) {
-          const sellFractionBn = new BigNumber(triggerConfig.sellAction).dividedBy(100);
+          const sellFractionBn = new BigNumber(
+            triggerConfig.sellAction,
+          ).dividedBy(100);
           const unitsToSellBn = cumulativeUnitsBn.multipliedBy(sellFractionBn);
           const saleProceedsBn = unitsToSellBn.multipliedBy(closeBn);
-          const soldCostBasisBn = costBasisPerUnitBn.multipliedBy(unitsToSellBn);
+          const soldCostBasisBn =
+            costBasisPerUnitBn.multipliedBy(unitsToSellBn);
           const realizedProfitBn = saleProceedsBn.minus(soldCostBasisBn);
 
           cumulativeUnitsBn = cumulativeUnitsBn.minus(unitsToSellBn);
@@ -317,7 +345,9 @@ export function runSingleAssetDcaBacktest(
         portfolioValue: bnToNumber(portfolioValueBn),
         costBasisPerUnit: bnToNumber(costBasisPerUnitBn),
         currentValue: bnToNumber(portfolioValueBn),
-        unrealizedProfitLossPercentage: bnToNumber(unrealizedProfitLossPercentageBn),
+        unrealizedProfitLossPercentage: bnToNumber(
+          unrealizedProfitLossPercentageBn,
+        ),
       });
 
       nextBuy = nextBuyDateEpochMs(nextBuy, frequency);
@@ -326,15 +356,17 @@ export function runSingleAssetDcaBacktest(
 
   // Use last known close within [startDate, endDate] as "current".
   // If there were no points in range (shouldn't happen if caller uses PriceService properly), error.
-  const lastPointInRange = [...prices]
-    .reverse()
-    .find((p) => {
-      const d = toUtcMidnightEpochMs(p.date);
-      return d >= startDate && d <= endDate && isFiniteNumber(p.close) && p.close > 0;
-    });
+  const lastPointInRange = [...prices].reverse().find((p) => {
+    const d = toUtcMidnightEpochMs(p.date);
+    return (
+      d >= startDate && d <= endDate && isFiniteNumber(p.close) && p.close > 0
+    );
+  });
 
   if (!lastPointInRange) {
-    throw new BadRequestException('No usable price points in the given date range.');
+    throw new BadRequestException(
+      'No usable price points in the given date range.',
+    );
   }
 
   const lastCloseBn = new BigNumber(lastPointInRange.close);
@@ -349,7 +381,10 @@ export function runSingleAssetDcaBacktest(
   const totalReturnPercentage = cumulativeInvestedBn.isZero()
     ? 0
     : bnToNumber(
-        currentValueBn.minus(cumulativeInvestedBn).dividedBy(cumulativeInvestedBn).multipliedBy(100),
+        currentValueBn
+          .minus(cumulativeInvestedBn)
+          .dividedBy(cumulativeInvestedBn)
+          .multipliedBy(100),
       );
 
   return {
@@ -383,7 +418,10 @@ function findFirstPriceOnOrAfter(
   return null;
 }
 
-function closeOnOrBeforeDay(prices: PricePoint[], dayUtcMidnight: number): number | null {
+function closeOnOrBeforeDay(
+  prices: PricePoint[],
+  dayUtcMidnight: number,
+): number | null {
   let close: number | null = null;
   for (const p of prices) {
     const d = toUtcMidnightEpochMs(p.date);
@@ -401,7 +439,12 @@ function lastCloseInRange(
   let best: PricePoint | null = null;
   for (const p of prices) {
     const d = toUtcMidnightEpochMs(p.date);
-    if (d >= startUtc && d <= endUtc && isFiniteNumber(p.close) && p.close > 0) {
+    if (
+      d >= startUtc &&
+      d <= endUtc &&
+      isFiniteNumber(p.close) &&
+      p.close > 0
+    ) {
       best = p;
     }
   }
@@ -421,7 +464,9 @@ export function runPortfolioDcaBacktest(
   const { assets, frequency } = params;
 
   if (!isFiniteNumber(params.startDate) || !isFiniteNumber(params.endDate)) {
-    throw new BadRequestException('startDate and endDate must be epoch milliseconds.');
+    throw new BadRequestException(
+      'startDate and endDate must be epoch milliseconds.',
+    );
   }
 
   const startDate = toUtcMidnightEpochMs(params.startDate);
@@ -446,13 +491,17 @@ export function runPortfolioDcaBacktest(
     }
     seenSym.add(sym);
     if (!isFiniteNumber(a.weight) || a.weight <= 0) {
-      throw new BadRequestException(`Weight for ${sym} must be a positive number.`);
+      throw new BadRequestException(
+        `Weight for ${sym} must be a positive number.`,
+      );
     }
     weightSum = weightSum.plus(a.weight);
     normalizedAssets.push({ symbol: sym, weight: a.weight });
   }
 
-  if (weightSum.minus(100).abs().isGreaterThan(PORTFOLIO_WEIGHT_SUM_TOLERANCE)) {
+  if (
+    weightSum.minus(100).abs().isGreaterThan(PORTFOLIO_WEIGHT_SUM_TOLERANCE)
+  ) {
     throw new BadRequestException('Asset weights must sum to 100%.');
   }
 
@@ -468,27 +517,39 @@ export function runPortfolioDcaBacktest(
   for (const { symbol } of normalizedAssets) {
     const s = upperSeries[symbol];
     if (!Array.isArray(s) || s.length === 0) {
-      throw new BadRequestException(`Price series missing or empty for ${symbol}.`);
+      throw new BadRequestException(
+        `Price series missing or empty for ${symbol}.`,
+      );
     }
   }
+
+  const { triggers } = params;
+  validateTriggerConfig(triggers?.takeProfit, 'takeProfit');
+  validateTriggerConfig(triggers?.stopLoss, 'stopLoss');
 
   const totalAmountBn = new BigNumber(params.totalAmount);
   const unitsBn: Record<string, BigNumber> = {};
   const investedBn: Record<string, BigNumber> = {};
+  const costBasisBn: Record<string, BigNumber> = {};
   for (const { symbol } of normalizedAssets) {
     unitsBn[symbol] = new BigNumber(0);
     investedBn[symbol] = new BigNumber(0);
+    costBasisBn[symbol] = new BigNumber(0);
   }
 
   let totalInvestedBn = new BigNumber(0);
+  let totalCostBasisBn = new BigNumber(0);
+  let cashBalanceBn = new BigNumber(0);
   let numberOfPurchases = 0;
   const timeline: PortfolioBacktestTimelinePoint[] = [];
+  const trades: BacktestTrade[] = [];
 
   let nextBuy = startDate;
 
   while (nextBuy <= endDate) {
     const scheduled = nextBuy;
-    const legs: { symbol: string; point: PricePoint; amountBn: BigNumber }[] = [];
+    const legs: { symbol: string; point: PricePoint; amountBn: BigNumber }[] =
+      [];
     let markDate = scheduled;
 
     for (const { symbol, weight } of normalizedAssets) {
@@ -511,21 +572,102 @@ export function runPortfolioDcaBacktest(
       const bought = amt.dividedBy(closeBn);
       unitsBn[symbol] = unitsBn[symbol].plus(bought);
       investedBn[symbol] = investedBn[symbol].plus(amt);
+      costBasisBn[symbol] = costBasisBn[symbol].plus(amt);
       totalInvestedBn = totalInvestedBn.plus(amt);
+      totalCostBasisBn = totalCostBasisBn.plus(amt);
     }
     numberOfPurchases += 1;
 
-    let portfolioValueBn = new BigNumber(0);
-    const slices: PortfolioTimelineAssetSlice[] = [];
-
+    // Compute holdings value per asset
+    let holdingsValueBn = new BigNumber(0);
+    const closePrices: Record<string, BigNumber> = {};
     for (const { symbol } of normalizedAssets) {
       const closeVal = closeOnOrBeforeDay(upperSeries[symbol], markDate);
       if (closeVal === null) {
-        throw new BadRequestException(`No price to value ${symbol} on or before execution date.`);
+        throw new BadRequestException(
+          `No price to value ${symbol} on or before execution date.`,
+        );
       }
-      const closeBn = new BigNumber(closeVal);
-      const valueBn = unitsBn[symbol].multipliedBy(closeBn);
-      portfolioValueBn = portfolioValueBn.plus(valueBn);
+      closePrices[symbol] = new BigNumber(closeVal);
+      holdingsValueBn = holdingsValueBn.plus(
+        unitsBn[symbol].multipliedBy(closePrices[symbol]),
+      );
+    }
+
+    // Evaluate trigger on whole portfolio
+    const unrealizedPnlPctBn = totalCostBasisBn.isZero()
+      ? new BigNumber(0)
+      : holdingsValueBn
+          .minus(totalCostBasisBn)
+          .dividedBy(totalCostBasisBn)
+          .multipliedBy(100);
+
+    const triggeredTradeType = determineTriggeredTradeType(
+      unrealizedPnlPctBn,
+      triggers,
+    );
+
+    if (triggeredTradeType) {
+      const triggerConfig = triggers?.[triggeredTradeType];
+      if (triggerConfig && holdingsValueBn.isGreaterThan(0)) {
+        const sellFractionBn = new BigNumber(
+          triggerConfig.sellAction,
+        ).dividedBy(100);
+        let totalSaleProceedsBn = new BigNumber(0);
+        let totalSoldCostBasisBn = new BigNumber(0);
+
+        for (const { symbol } of normalizedAssets) {
+          const unitsToSellBn = unitsBn[symbol].multipliedBy(sellFractionBn);
+          const saleProceedsBn = unitsToSellBn.multipliedBy(
+            closePrices[symbol],
+          );
+          const assetCostBasisPerUnit = unitsBn[symbol].isZero()
+            ? new BigNumber(0)
+            : costBasisBn[symbol].dividedBy(unitsBn[symbol]);
+          const soldCostBasisBn =
+            assetCostBasisPerUnit.multipliedBy(unitsToSellBn);
+
+          unitsBn[symbol] = unitsBn[symbol].minus(unitsToSellBn);
+          costBasisBn[symbol] = BigNumber.max(
+            0,
+            costBasisBn[symbol].minus(soldCostBasisBn),
+          );
+          totalSaleProceedsBn = totalSaleProceedsBn.plus(saleProceedsBn);
+          totalSoldCostBasisBn = totalSoldCostBasisBn.plus(soldCostBasisBn);
+        }
+
+        const realizedProfitBn =
+          totalSaleProceedsBn.minus(totalSoldCostBasisBn);
+        totalCostBasisBn = BigNumber.max(
+          0,
+          totalCostBasisBn.minus(totalSoldCostBasisBn),
+        );
+        cashBalanceBn = cashBalanceBn.plus(totalSaleProceedsBn);
+
+        trades.push({
+          date: markDate,
+          type: triggeredTradeType,
+          price: 0,
+          units: bnToNumber(sellFractionBn),
+          profit: bnToNumber(realizedProfitBn),
+          sellAction: triggerConfig.sellAction,
+        });
+
+        // Recompute holdings value after sell
+        holdingsValueBn = new BigNumber(0);
+        for (const { symbol } of normalizedAssets) {
+          holdingsValueBn = holdingsValueBn.plus(
+            unitsBn[symbol].multipliedBy(closePrices[symbol]),
+          );
+        }
+      }
+    }
+
+    const portfolioValueBn = cashBalanceBn.plus(holdingsValueBn);
+
+    const slices: PortfolioTimelineAssetSlice[] = [];
+    for (const { symbol } of normalizedAssets) {
+      const valueBn = unitsBn[symbol].multipliedBy(closePrices[symbol]);
       slices.push({
         symbol,
         units: bnToNumber(unitsBn[symbol]),
@@ -538,14 +680,14 @@ export function runPortfolioDcaBacktest(
       date: markDate,
       portfolioValue: bnToNumber(portfolioValueBn),
       cumulativeInvested: bnToNumber(totalInvestedBn),
-      costBasisTotal: bnToNumber(totalInvestedBn),
+      costBasisTotal: bnToNumber(totalCostBasisBn),
       currentValue: bnToNumber(portfolioValueBn),
-      unrealizedProfitLossPercentage: totalInvestedBn.isZero()
+      unrealizedProfitLossPercentage: totalCostBasisBn.isZero()
         ? 0
         : bnToNumber(
-            portfolioValueBn
-              .minus(totalInvestedBn)
-              .dividedBy(totalInvestedBn)
+            holdingsValueBn
+              .minus(totalCostBasisBn)
+              .dividedBy(totalCostBasisBn)
               .multipliedBy(100),
           ),
       assets: slices,
@@ -554,17 +696,19 @@ export function runPortfolioDcaBacktest(
     nextBuy = nextBuyDateEpochMs(scheduled, frequency);
   }
 
-  let finalValueBn = new BigNumber(0);
+  let finalHoldingsValueBn = new BigNumber(0);
   const breakdown: PortfolioAssetBreakdown[] = [];
 
   for (const { symbol, weight } of normalizedAssets) {
     const lastPt = lastCloseInRange(upperSeries[symbol], startDate, endDate);
     if (!lastPt) {
-      throw new BadRequestException(`No usable price points in range for ${symbol}.`);
+      throw new BadRequestException(
+        `No usable price points in range for ${symbol}.`,
+      );
     }
     const closeBn = new BigNumber(lastPt.close);
     const curVBn = unitsBn[symbol].multipliedBy(closeBn);
-    finalValueBn = finalValueBn.plus(curVBn);
+    finalHoldingsValueBn = finalHoldingsValueBn.plus(curVBn);
     const inv = investedBn[symbol];
     const retPct = inv.isZero()
       ? new BigNumber(0)
@@ -579,10 +723,17 @@ export function runPortfolioDcaBacktest(
     });
   }
 
+  const finalValueBn = finalHoldingsValueBn.plus(cashBalanceBn);
+  const realizedProfit = trades.reduce((sum, trade) => sum + trade.profit, 0);
+  const unrealizedValue = bnToNumber(finalHoldingsValueBn);
+
   const totalReturnPercentage = totalInvestedBn.isZero()
     ? 0
     : bnToNumber(
-        finalValueBn.minus(totalInvestedBn).dividedBy(totalInvestedBn).multipliedBy(100),
+        finalValueBn
+          .minus(totalInvestedBn)
+          .dividedBy(totalInvestedBn)
+          .multipliedBy(100),
       );
 
   return {
@@ -591,15 +742,21 @@ export function runPortfolioDcaBacktest(
       currentValue: bnToNumber(finalValueBn),
       totalReturnPercentage,
       numberOfPurchases,
+      realizedProfit,
+      unrealizedValue,
       assets: breakdown,
     },
     timeline,
+    trades,
   };
 }
 
 @Injectable()
 export class CalculationService {
-  runSingleAssetDcaBacktest(prices: PricePoint[], params: RunSingleAssetDcaBacktestParams) {
+  runSingleAssetDcaBacktest(
+    prices: PricePoint[],
+    params: RunSingleAssetDcaBacktestParams,
+  ) {
     return runSingleAssetDcaBacktest(prices, params);
   }
 
