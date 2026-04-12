@@ -8,7 +8,7 @@ import {
   Line,
   ReferenceDot,
 } from "recharts";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -131,6 +131,22 @@ export function PortfolioTrajectoryChart({
     })
     .filter((marker): marker is NonNullable<typeof marker> => marker !== null);
 
+  /**
+   * Build a Map<YYYY-MM-DD, BacktestTrade[]> so the tooltip can look up
+   * whether any TP/SL fired on the date the cursor is currently hovering.
+  */
+  const tradesByDate = useMemo(() => {
+    const map = new Map<string, BacktestTrade[]>();
+    for (const trade of trades) {
+      const date = new Date(trade.date).toISOString().slice(0, 10);
+      const existing = map.get(date) ?? [];
+      existing.push(trade);
+      map.set(date, existing);
+    }
+    return map;
+  }, [trades]);
+ 
+
   return (
     <Card
       className={cn(
@@ -225,8 +241,19 @@ export function PortfolioTrajectoryChart({
               }
               dx={-10}
             />
+
+            {/*
+             * Pass tradesByDate into the tooltip so it can render trade details
+             * when the cursor lands on a sell marker date (L3-FE-2).
+             */}
+
             <RechartsTooltip
-              content={<ChartTooltip assetLabel={assetLabel} />}
+              content={
+                <ChartTooltip
+                  assetLabel={assetLabel}
+                  tradesByDate={tradesByDate}
+                />
+              }
               cursor={{
                 stroke: "hsl(var(--primary))",
                 strokeWidth: 1,
@@ -336,6 +363,7 @@ export function PortfolioTrajectoryChart({
 
                   return (
                     <g>
+                      {/* Small label above the dot */}
                       <text
                         x={cx}
                         y={cy - 10}
@@ -349,8 +377,9 @@ export function PortfolioTrajectoryChart({
                         }
                         style={{ pointerEvents: "none" }}
                       >
-                        $
+                        {marker.type === "takeProfit" ? "TP" : "SL"}
                       </text>
+                      {/* The dot itself */}
                       <circle
                         cx={cx}
                         cy={cy}
@@ -368,9 +397,7 @@ export function PortfolioTrajectoryChart({
                         strokeWidth={isHovered ? 2.5 : 2}
                         onMouseEnter={() => setHoveredMarkerId(marker.id)}
                         onMouseLeave={() => setHoveredMarkerId(null)}
-                      >
-                        <title>{markerLabel}</title>
-                      </circle>
+                      />
                     </g>
                   );
                 }}
@@ -382,3 +409,4 @@ export function PortfolioTrajectoryChart({
     </Card>
   );
 }
+ 
