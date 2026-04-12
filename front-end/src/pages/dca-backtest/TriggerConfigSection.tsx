@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { Control } from "react-hook-form";
 import {
@@ -32,6 +33,8 @@ function TriggerNumberField({
   min,
   max,
 }: TriggerNumberFieldProps) {
+
+  const [localValue, setLocalValue] = useState<string | null>(null);
   return (
     <FormField
       control={control}
@@ -50,11 +53,17 @@ function TriggerNumberField({
               className="h-9"
               name={field.name}
               ref={field.ref}
-              onBlur={field.onBlur}
-              value={Number.isFinite(field.value) ? field.value : ""}
+              value={localValue ?? (Number.isFinite(field.value) ? String(field.value) : "")}
               onChange={(e) => {
-                const n = e.target.valueAsNumber;
+                // Just track the raw string — don't commit to RHF yet.
+                setLocalValue(e.target.value);
+              }}
+              onBlur={() => {
+                // Commit to RHF on blur, then clear local override.
+                const n = parseFloat(localValue ?? "");
                 field.onChange(Number.isNaN(n) ? 0 : n);
+                field.onBlur();
+                setLocalValue(null);
               }}
             />
           </FormControl>
