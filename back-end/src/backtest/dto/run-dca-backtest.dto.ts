@@ -28,11 +28,11 @@ export interface RunDcaBacktestParams {
   };
 }
 
-class TriggerRuleDto {
+export class TriggerRuleDto {
   @ApiProperty({ example: 50, description: 'Trigger threshold in percentage' })
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @IsPositive({ message: 'Trigger threshold must be greater than 0' })
   threshold: number;
 
   @ApiProperty({
@@ -46,7 +46,7 @@ class TriggerRuleDto {
   sellAction: number;
 }
 
-class BacktestTriggersDto {
+export class BacktestTriggersDto {
   @ApiProperty({ required: false, type: TriggerRuleDto })
   @IsOptional()
   @ValidateNested()
