@@ -33,7 +33,7 @@ export interface BacktestTimelinePoint {
   unrealizedProfitLossPercentage: number;
 }
 
-interface BacktestTrade {
+export interface BacktestTrade {
   date: number;
   type: 'takeProfit' | 'stopLoss';
   price: number;
@@ -71,6 +71,7 @@ export interface RunPortfolioDcaBacktestParams {
   frequency: DcaFrequency;
   startDate: number;
   endDate: number;
+  triggers?: BacktestTriggersParams;
 }
 
 export interface PortfolioAssetBreakdown {
@@ -104,12 +105,15 @@ export interface PortfolioBacktestSummary {
   currentValue: number;
   totalReturnPercentage: number;
   numberOfPurchases: number;
+  realizedProfit: number;
+  unrealizedValue: number;
   assets: PortfolioAssetBreakdown[];
 }
 
 export interface RunPortfolioDcaBacktestResult {
   summary: PortfolioBacktestSummary;
   timeline: PortfolioBacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 function toUtcMidnightEpochMs(epochMs: number): number {
@@ -472,17 +476,26 @@ export function runPortfolioDcaBacktest(
     }
   }
 
+  const { triggers } = params;
+  validateTriggerConfig(triggers?.takeProfit, 'takeProfit');
+  validateTriggerConfig(triggers?.stopLoss, 'stopLoss');
+
   const totalAmountBn = new BigNumber(params.totalAmount);
   const unitsBn: Record<string, BigNumber> = {};
   const investedBn: Record<string, BigNumber> = {};
+  const costBasisBn: Record<string, BigNumber> = {};
   for (const { symbol } of normalizedAssets) {
     unitsBn[symbol] = new BigNumber(0);
     investedBn[symbol] = new BigNumber(0);
+    costBasisBn[symbol] = new BigNumber(0);
   }
 
   let totalInvestedBn = new BigNumber(0);
+  let totalCostBasisBn = new BigNumber(0);
+  let cashBalanceBn = new BigNumber(0);
   let numberOfPurchases = 0;
   const timeline: PortfolioBacktestTimelinePoint[] = [];
+  const trades: BacktestTrade[] = [];
 
   let nextBuy = startDate;
 
@@ -511,21 +524,79 @@ export function runPortfolioDcaBacktest(
       const bought = amt.dividedBy(closeBn);
       unitsBn[symbol] = unitsBn[symbol].plus(bought);
       investedBn[symbol] = investedBn[symbol].plus(amt);
+      costBasisBn[symbol] = costBasisBn[symbol].plus(amt);
       totalInvestedBn = totalInvestedBn.plus(amt);
+      totalCostBasisBn = totalCostBasisBn.plus(amt);
     }
     numberOfPurchases += 1;
 
-    let portfolioValueBn = new BigNumber(0);
-    const slices: PortfolioTimelineAssetSlice[] = [];
-
+    // Compute holdings value per asset
+    let holdingsValueBn = new BigNumber(0);
+    const closePrices: Record<string, BigNumber> = {};
     for (const { symbol } of normalizedAssets) {
       const closeVal = closeOnOrBeforeDay(upperSeries[symbol], markDate);
       if (closeVal === null) {
         throw new BadRequestException(`No price to value ${symbol} on or before execution date.`);
       }
-      const closeBn = new BigNumber(closeVal);
-      const valueBn = unitsBn[symbol].multipliedBy(closeBn);
-      portfolioValueBn = portfolioValueBn.plus(valueBn);
+      closePrices[symbol] = new BigNumber(closeVal);
+      holdingsValueBn = holdingsValueBn.plus(unitsBn[symbol].multipliedBy(closePrices[symbol]));
+    }
+
+    // Evaluate trigger on whole portfolio
+    const unrealizedPnlPctBn = totalCostBasisBn.isZero()
+      ? new BigNumber(0)
+      : holdingsValueBn.minus(totalCostBasisBn).dividedBy(totalCostBasisBn).multipliedBy(100);
+
+    const triggeredTradeType = determineTriggeredTradeType(unrealizedPnlPctBn, triggers);
+
+    if (triggeredTradeType) {
+      const triggerConfig = triggers?.[triggeredTradeType];
+      if (triggerConfig && holdingsValueBn.isGreaterThan(0)) {
+        const sellFractionBn = new BigNumber(triggerConfig.sellAction).dividedBy(100);
+        let totalSaleProceedsBn = new BigNumber(0);
+        let totalSoldCostBasisBn = new BigNumber(0);
+
+        // Sell proportionally across all assets
+        for (const { symbol } of normalizedAssets) {
+          const unitsToSellBn = unitsBn[symbol].multipliedBy(sellFractionBn);
+          const saleProceedsBn = unitsToSellBn.multipliedBy(closePrices[symbol]);
+          const assetCostBasisPerUnit = unitsBn[symbol].isZero()
+            ? new BigNumber(0)
+            : costBasisBn[symbol].dividedBy(unitsBn[symbol]);
+          const soldCostBasisBn = assetCostBasisPerUnit.multipliedBy(unitsToSellBn);
+
+          unitsBn[symbol] = unitsBn[symbol].minus(unitsToSellBn);
+          costBasisBn[symbol] = BigNumber.max(0, costBasisBn[symbol].minus(soldCostBasisBn));
+          totalSaleProceedsBn = totalSaleProceedsBn.plus(saleProceedsBn);
+          totalSoldCostBasisBn = totalSoldCostBasisBn.plus(soldCostBasisBn);
+        }
+
+        const realizedProfitBn = totalSaleProceedsBn.minus(totalSoldCostBasisBn);
+        totalCostBasisBn = BigNumber.max(0, totalCostBasisBn.minus(totalSoldCostBasisBn));
+        cashBalanceBn = cashBalanceBn.plus(totalSaleProceedsBn);
+
+        trades.push({
+          date: markDate,
+          type: triggeredTradeType,
+          price: 0,
+          units: bnToNumber(sellFractionBn),
+          profit: bnToNumber(realizedProfitBn),
+          sellAction: triggerConfig.sellAction,
+        });
+
+        // Recompute holdings value after sell
+        holdingsValueBn = new BigNumber(0);
+        for (const { symbol } of normalizedAssets) {
+          holdingsValueBn = holdingsValueBn.plus(unitsBn[symbol].multipliedBy(closePrices[symbol]));
+        }
+      }
+    }
+
+    const portfolioValueBn = cashBalanceBn.plus(holdingsValueBn);
+
+    const slices: PortfolioTimelineAssetSlice[] = [];
+    for (const { symbol } of normalizedAssets) {
+      const valueBn = unitsBn[symbol].multipliedBy(closePrices[symbol]);
       slices.push({
         symbol,
         units: bnToNumber(unitsBn[symbol]),
@@ -538,14 +609,14 @@ export function runPortfolioDcaBacktest(
       date: markDate,
       portfolioValue: bnToNumber(portfolioValueBn),
       cumulativeInvested: bnToNumber(totalInvestedBn),
-      costBasisTotal: bnToNumber(totalInvestedBn),
+      costBasisTotal: bnToNumber(totalCostBasisBn),
       currentValue: bnToNumber(portfolioValueBn),
-      unrealizedProfitLossPercentage: totalInvestedBn.isZero()
+      unrealizedProfitLossPercentage: totalCostBasisBn.isZero()
         ? 0
         : bnToNumber(
-            portfolioValueBn
-              .minus(totalInvestedBn)
-              .dividedBy(totalInvestedBn)
+            holdingsValueBn
+              .minus(totalCostBasisBn)
+              .dividedBy(totalCostBasisBn)
               .multipliedBy(100),
           ),
       assets: slices,
@@ -554,7 +625,7 @@ export function runPortfolioDcaBacktest(
     nextBuy = nextBuyDateEpochMs(scheduled, frequency);
   }
 
-  let finalValueBn = new BigNumber(0);
+  let finalHoldingsValueBn = new BigNumber(0);
   const breakdown: PortfolioAssetBreakdown[] = [];
 
   for (const { symbol, weight } of normalizedAssets) {
@@ -564,7 +635,7 @@ export function runPortfolioDcaBacktest(
     }
     const closeBn = new BigNumber(lastPt.close);
     const curVBn = unitsBn[symbol].multipliedBy(closeBn);
-    finalValueBn = finalValueBn.plus(curVBn);
+    finalHoldingsValueBn = finalHoldingsValueBn.plus(curVBn);
     const inv = investedBn[symbol];
     const retPct = inv.isZero()
       ? new BigNumber(0)
@@ -579,6 +650,10 @@ export function runPortfolioDcaBacktest(
     });
   }
 
+  const finalValueBn = finalHoldingsValueBn.plus(cashBalanceBn);
+  const realizedProfit = trades.reduce((sum, trade) => sum + trade.profit, 0);
+  const unrealizedValue = bnToNumber(finalHoldingsValueBn);
+
   const totalReturnPercentage = totalInvestedBn.isZero()
     ? 0
     : bnToNumber(
@@ -591,9 +666,12 @@ export function runPortfolioDcaBacktest(
       currentValue: bnToNumber(finalValueBn),
       totalReturnPercentage,
       numberOfPurchases,
+      realizedProfit,
+      unrealizedValue,
       assets: breakdown,
     },
     timeline,
+    trades,
   };
 }
 

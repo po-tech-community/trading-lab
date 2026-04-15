@@ -6,12 +6,14 @@ import {
     IsIn,
     IsInt,
     IsNumber,
+    IsOptional,
     IsPositive,
     IsString,
     IsUppercase,
     ValidateNested,
 } from 'class-validator';
 import { DCA_FREQUENCIES, type DcaFrequency } from './dca-frequency';
+import { BacktestTriggersDto } from './run-dca-backtest.dto';
 
 /**
  * One asset entry in the portfolio request.
@@ -82,4 +84,17 @@ export class RunPortfolioDcaBacktestDto {
     @IsNumber()
     @IsInt()
     endDate: number;
+
+    @ApiProperty({
+        required: false,
+        description: 'Optional take profit and stop loss triggers (applied to whole portfolio)',
+        example: {
+            takeProfit: { threshold: 50, sellAction: 100 },
+            stopLoss: { threshold: 15, sellAction: 50 },
+        },
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => BacktestTriggersDto)
+    triggers?: BacktestTriggersDto;
 }

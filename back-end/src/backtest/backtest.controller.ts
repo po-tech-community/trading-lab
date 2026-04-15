@@ -148,6 +148,7 @@ export class BacktestController {
         frequency: dto.frequency,
         startDate: dto.startDate,
         endDate: dto.endDate,
+        triggers: dto.triggers,
       },
     );
 
