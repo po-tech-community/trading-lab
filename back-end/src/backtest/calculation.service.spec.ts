@@ -343,4 +343,32 @@ describe('runPortfolioDcaBacktest', () => {
     expect(portfolio.summary.currentValue).toBeCloseTo(single.summary.currentValue, 8);
     expect(portfolio.trades).toHaveLength(single.trades.length);
   });
+
+  it('keeps portfolio timeline consistent after a trigger sell', () => {
+    const prices: PricePoint[] = [
+      { date: day('2025-01-01'), close: 10 },
+      { date: day('2025-01-02'), close: 20 },
+      { date: day('2025-01-03'), close: 25 },
+    ];
+
+    const result = runPortfolioDcaBacktest(
+      { BTC: prices },
+      {
+        assets: [{ symbol: 'BTC', weight: 100 }],
+        totalAmount: 100,
+        frequency: 'daily',
+        startDate: day('2025-01-01'),
+        endDate: day('2025-01-03'),
+        triggers: { takeProfit: { threshold: 50, sellAction: 50 } },
+      },
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].price).toBeCloseTo(20, 8);
+    expect(result.trades[0].units).toBeCloseTo(7.5, 8);
+    expect(result.timeline[1].costBasisTotal).toBeCloseTo(100, 8);
+    expect(result.timeline[1].currentValue).toBeCloseTo(300, 8);
+    expect(result.timeline[1].assets[0].units).toBeCloseTo(7.5, 8);
+    expect(result.timeline[1].assets[0].value).toBeCloseTo(150, 8);
+  });
 });
