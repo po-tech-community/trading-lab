@@ -107,6 +107,7 @@ export interface PortfolioBacktestSummary {
 export interface RunPortfolioBacktestResponse {
   summary: PortfolioBacktestSummary;
   timeline: PortfolioBacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 export async function runPortfolioBacktest(
