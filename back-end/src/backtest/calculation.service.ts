@@ -555,6 +555,7 @@ export function runPortfolioDcaBacktest(
         const sellFractionBn = new BigNumber(triggerConfig.sellAction).dividedBy(100);
         let totalSaleProceedsBn = new BigNumber(0);
         let totalSoldCostBasisBn = new BigNumber(0);
+        let totalUnitsSoldBn = new BigNumber(0);
 
         // Sell proportionally across all assets
         for (const { symbol } of normalizedAssets) {
@@ -569,17 +570,21 @@ export function runPortfolioDcaBacktest(
           costBasisBn[symbol] = BigNumber.max(0, costBasisBn[symbol].minus(soldCostBasisBn));
           totalSaleProceedsBn = totalSaleProceedsBn.plus(saleProceedsBn);
           totalSoldCostBasisBn = totalSoldCostBasisBn.plus(soldCostBasisBn);
+          totalUnitsSoldBn = totalUnitsSoldBn.plus(unitsToSellBn);
         }
 
         const realizedProfitBn = totalSaleProceedsBn.minus(totalSoldCostBasisBn);
         totalCostBasisBn = BigNumber.max(0, totalCostBasisBn.minus(totalSoldCostBasisBn));
         cashBalanceBn = cashBalanceBn.plus(totalSaleProceedsBn);
+        const effectiveSellPriceBn = totalUnitsSoldBn.isZero()
+          ? new BigNumber(0)
+          : totalSaleProceedsBn.dividedBy(totalUnitsSoldBn);
 
         trades.push({
           date: markDate,
           type: triggeredTradeType,
-          price: 0,
-          units: bnToNumber(sellFractionBn),
+          price: bnToNumber(effectiveSellPriceBn),
+          units: bnToNumber(totalUnitsSoldBn),
           profit: bnToNumber(realizedProfitBn),
           sellAction: triggerConfig.sellAction,
         });
