@@ -71,6 +71,10 @@ export interface RunPortfolioBacktestRequestBody {
   frequency: DcaFrequency;
   startDate: number;
   endDate: number;
+  triggers?: {
+    takeProfit?: { threshold: number; sellAction: number };
+    stopLoss?: { threshold: number; sellAction: number };
+  };
 }
 
 export interface PortfolioTimelineAssetSlice {
@@ -107,6 +111,7 @@ export interface PortfolioBacktestSummary {
 export interface RunPortfolioBacktestResponse {
   summary: PortfolioBacktestSummary;
   timeline: PortfolioBacktestTimelinePoint[];
+  trades: BacktestTrade[];
 }
 
 export async function runPortfolioBacktest(

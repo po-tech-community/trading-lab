@@ -49,6 +49,12 @@ export const portfolioFormSchema = z
     frequency: z.enum(["daily", "weekly", "monthly"]),
     startDate: z.string().min(1, "Start date is required."),
     endDate: z.string().min(1, "End date is required."),
+    takeProfitEnabled: z.boolean(),
+    takeProfitThreshold: z.number(),
+    takeProfitSellPercent: z.number(),
+    stopLossEnabled: z.boolean(),
+    stopLossThreshold: z.number(),
+    stopLossSellPercent: z.number(),
   })
   // Weights must sum to 100
   .refine(
@@ -84,6 +90,34 @@ export const portfolioFormSchema = z
       return diffDays <= 365;
     },
     { message: "Date range cannot exceed 365 days.", path: ["endDate"] },
+  )
+  .refine(
+    (data) => {
+      if (!data.takeProfitEnabled) return true;
+      return Number.isFinite(data.takeProfitThreshold) && data.takeProfitThreshold > 0 && data.takeProfitThreshold <= 1000;
+    },
+    { message: "Take profit threshold must be between 0.1% and 1000%.", path: ["takeProfitThreshold"] },
+  )
+  .refine(
+    (data) => {
+      if (!data.takeProfitEnabled) return true;
+      return Number.isFinite(data.takeProfitSellPercent) && data.takeProfitSellPercent >= 1 && data.takeProfitSellPercent <= 100;
+    },
+    { message: "Sell % must be between 1 and 100.", path: ["takeProfitSellPercent"] },
+  )
+  .refine(
+    (data) => {
+      if (!data.stopLossEnabled) return true;
+      return Number.isFinite(data.stopLossThreshold) && data.stopLossThreshold > 0 && data.stopLossThreshold <= 100;
+    },
+    { message: "Stop loss threshold must be between 0.1% and 100%.", path: ["stopLossThreshold"] },
+  )
+  .refine(
+    (data) => {
+      if (!data.stopLossEnabled) return true;
+      return Number.isFinite(data.stopLossSellPercent) && data.stopLossSellPercent >= 1 && data.stopLossSellPercent <= 100;
+    },
+    { message: "Sell % must be between 1 and 100.", path: ["stopLossSellPercent"] },
   );
 
 export type PortfolioFormValues = z.infer<typeof portfolioFormSchema>;
@@ -91,11 +125,27 @@ export type PortfolioFormValues = z.infer<typeof portfolioFormSchema>;
 export function portfolioFormValuesToRequest(
   values: PortfolioFormValues,
 ): RunPortfolioBacktestRequestBody {
+
+  const triggers: RunPortfolioBacktestRequestBody["triggers"] = {};
+  if (values.takeProfitEnabled) {
+    triggers.takeProfit = {
+      threshold: values.takeProfitThreshold,
+      sellAction: values.takeProfitSellPercent,
+    };
+  }
+  if (values.stopLossEnabled) {
+    triggers.stopLoss = {
+      threshold: values.stopLossThreshold,
+      sellAction: values.stopLossSellPercent,
+    };
+  }
+
   return {
     assets: values.assets.map((a) => ({ symbol: a.symbol, weight: a.weight })),
     totalAmount: values.totalAmount,
     frequency: values.frequency,
     startDate: Date.parse(`${values.startDate}T00:00:00.000Z`),
     endDate: Date.parse(`${values.endDate}T00:00:00.000Z`),
+    triggers: Object.keys(triggers).length > 0 ? triggers : undefined,
   };
 }

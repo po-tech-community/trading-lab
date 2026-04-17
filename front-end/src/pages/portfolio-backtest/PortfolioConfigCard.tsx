@@ -7,13 +7,8 @@
  *  - Submit blocked until weights sum to 100%
  */
 
-import {
-  ChevronLeft,
-  ChevronRight,
-  DollarSign,
-  Settings2,
-  Target,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, DollarSign, Settings2, Target, TrendingUp, ShieldAlert } from "lucide-react";
+import { TriggerConfigSection } from "@/pages/dca-backtest/TriggerConfigSection";
 import {
   Card,
   CardContent,
@@ -89,6 +84,12 @@ export function PortfolioConfigCard({
       frequency: "weekly",
       startDate: defaultStart,
       endDate: defaultEnd,
+      takeProfitEnabled: false,
+      takeProfitThreshold: 20,
+      takeProfitSellPercent: 100,
+      stopLossEnabled: false,
+      stopLossThreshold: 10,
+      stopLossSellPercent: 100,
     },
     mode: "onChange",
   });
@@ -97,6 +98,9 @@ export function PortfolioConfigCard({
   const assets = form.watch("assets");
   const weightSum = assets.reduce((s, a) => s + (Number(a.weight) || 0), 0);
   const isWeightSumValid = weightSum === 100;
+
+  const takeProfitEnabled = form.watch("takeProfitEnabled");
+  const stopLossEnabled = form.watch("stopLossEnabled");
 
   const handleSubmit = form.handleSubmit((values) => {
     onSubmit(portfolioFormValuesToRequest(values));
@@ -285,6 +289,35 @@ export function PortfolioConfigCard({
                     {submitError}
                   </p>
                 )}
+
+                <Separator />
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Smart Triggers
+                  </p>
+                  <TriggerConfigSection
+                    control={form.control}
+                    enabledName="takeProfitEnabled"
+                    enabled={takeProfitEnabled}
+                    title="Take Profit"
+                    icon={<TrendingUp className="size-3.5 text-emerald-500" />}
+                    thresholdName="takeProfitThreshold"
+                    thresholdLabel="Trigger at gain (%)"
+                    thresholdMax={1000}
+                    sellPercentName="takeProfitSellPercent"
+                  />
+                  <TriggerConfigSection
+                    control={form.control}
+                    enabledName="stopLossEnabled"
+                    enabled={stopLossEnabled}
+                    title="Stop Loss"
+                    icon={<ShieldAlert className="size-3.5 text-rose-500" />}
+                    thresholdName="stopLossThreshold"
+                    thresholdLabel="Trigger at loss (%)"
+                    thresholdMax={100}
+                    sellPercentName="stopLossSellPercent"
+                  />
+                </div>
 
                 {/* ── Submit ── */}
                 {/*

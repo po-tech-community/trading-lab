@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { Control } from "react-hook-form";
+import type { Control, FieldValues, Path } from "react-hook-form";
 import {
   FormControl,
   FormField,
@@ -10,29 +10,25 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import type { BacktestFormValues } from "./backtest-form-schema";
 
-type TriggerEnabledField = "takeProfitEnabled" | "stopLossEnabled";
-type TriggerThresholdField = "takeProfitThreshold" | "stopLossThreshold";
-type TriggerSellPercentField = "takeProfitSellPercent" | "stopLossSellPercent";
 
-interface TriggerNumberFieldProps {
-  control: Control<BacktestFormValues>;
-  name: TriggerThresholdField | TriggerSellPercentField;
+interface TriggerNumberFieldProps<T extends FieldValues> {
+  control: Control<T>;
+  name: Path<T>;
   label: string;
   step: string;
   min: number;
   max?: number;
 }
 
-function TriggerNumberField({
+function TriggerNumberField<T extends FieldValues>({
   control,
   name,
   label,
   step,
   min,
   max,
-}: TriggerNumberFieldProps) {
+}: TriggerNumberFieldProps<T>) {
 
   const [localValue, setLocalValue] = useState<string | null>(null);
   return (
@@ -76,19 +72,19 @@ function TriggerNumberField({
   );
 }
 
-export interface TriggerConfigSectionProps {
-  control: Control<BacktestFormValues>;
-  enabledName: TriggerEnabledField;
+export interface TriggerConfigSectionProps<T extends FieldValues> {
+  control: Control<T>;
+  enabledName: Path<T>;
   enabled: boolean;
   title: string;
   icon: ReactNode;
-  thresholdName: TriggerThresholdField;
+  thresholdName: Path<T>;
   thresholdLabel: string;
   thresholdMax?: number;
-  sellPercentName: TriggerSellPercentField;
+  sellPercentName: Path<T>;
 }
 
-export function TriggerConfigSection({
+export function TriggerConfigSection<T extends FieldValues>({
   control,
   enabledName,
   enabled,
@@ -98,7 +94,7 @@ export function TriggerConfigSection({
   thresholdLabel,
   thresholdMax,
   sellPercentName,
-}: TriggerConfigSectionProps) {
+}: TriggerConfigSectionProps<T>) {
   return (
     <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">

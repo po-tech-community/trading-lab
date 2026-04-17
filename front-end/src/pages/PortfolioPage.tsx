@@ -131,6 +131,7 @@ export default function PortfolioPage() {
             <PortfolioTrajectoryChart
               data={chartData}
               isFullscreen={false}
+              trades={result?.trades ?? []}
               onFullscreenChange={() => {}}
               chartDescription={`Portfolio performance (${chartData.length} points)`}
               assetLabel="Portfolio"
