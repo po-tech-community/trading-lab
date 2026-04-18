@@ -360,10 +360,10 @@ export function PortfolioTrajectoryChart({
                     `Price: $${marker.price.toFixed(2)}\n` +
                     `Amount sold: ${marker.units.toFixed(6)}\n` +
                     `Realized profit: ${marker.profit >= 0 ? "+" : ""}$${marker.profit.toFixed(2)}`;
+                  void markerLabel;
 
                   return (
                     <g>
-                      <title>{markerLabel}</title>
                       {/* Small label above the dot */}
                       <text
                         x={cx}

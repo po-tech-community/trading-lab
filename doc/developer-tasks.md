@@ -19,14 +19,14 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 
 ---
 
-## Status Summary (2026-04-17)
+## Status Summary (2026-04-05)
 
 | Level                | Backend           | Frontend                                          | Overall  |
 | -------------------- | ----------------- | ------------------------------------------------- | -------- |
 | **L0 Auth**          | Done (11/11)      | Done (6/6)                                        | Complete |
 | **L1 DCA Backtest**  | Done (4/4)        | Done (3/3)                                        | Complete |
 | **L2 Portfolio DCA** | Done (3/3)        | In progress 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%     |
-| **L3 Triggers**      | In progress 3/6   | In progress 3/6 (L3-FE-1,3,6 done)                | ~50%     |
+| **L3 Triggers**      | In progress 3/6   | In progress 2/6                                   | ~42%     |
 | **L4 AI Adapt**      | Not started (0/6) | Not started (0/5)                                 | 0%       |
 | **INFRA**            | Done (1/4)        | N/A                                               | 25%      |
 
@@ -37,10 +37,6 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 - **L2-FE-1**: Dynamic asset list component fully integrated (Merged #26)
 - **L2-FE-2/3**: Ready for assignment; L2-BE and L2-FE-1 prerequisites complete
 - **Build Status**: All passing (backend + frontend both build cleanly)
-
-### Recent Updates (April 17, 2026)
-
-- **L3-FE-6**: Portfolio trade history on `PortfolioPage` — reuse `TradeHistoryTable` under `PortfolioTrajectoryChart`; `PortfolioBacktestSummary` includes `realizedProfit` and `unrealizedValue` for summary cards.
 
 ---
 

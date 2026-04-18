@@ -95,8 +95,8 @@ export default function PortfolioPage() {
                       0,
                     ),
                     numberOfPurchases: result.summary.numberOfPurchases,
-                    realizedProfit: result.summary.realizedProfit,
-                    unrealizedValue: result.summary.unrealizedValue,
+                    realizedProfit: 0, // TODO: implement for portfolio
+                    unrealizedValue: result.summary.currentValue, // TODO: implement for portfolio
                   }
                 : null
             }
