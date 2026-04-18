@@ -19,14 +19,14 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 
 ---
 
-## Status Summary (2026-04-05)
+## Status Summary (2026-04-17)
 
 | Level                | Backend           | Frontend                                          | Overall  |
 | -------------------- | ----------------- | ------------------------------------------------- | -------- |
 | **L0 Auth**          | Done (11/11)      | Done (6/6)                                        | Complete |
 | **L1 DCA Backtest**  | Done (4/4)        | Done (3/3)                                        | Complete |
 | **L2 Portfolio DCA** | Done (3/3)        | In progress 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%     |
-| **L3 Triggers**      | In progress 3/6   | In progress 2/6                                   | ~42%     |
+| **L3 Triggers**      | In progress 3/6   | In progress 3/6 (L3-FE-1,3,6 done)                | ~50%     |
 | **L4 AI Adapt**      | Not started (0/6) | Not started (0/5)                                 | 0%       |
 | **INFRA**            | Done (1/4)        | N/A                                               | 25%      |
 
@@ -37,6 +37,10 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 - **L2-FE-1**: Dynamic asset list component fully integrated (Merged #26)
 - **L2-FE-2/3**: Ready for assignment; L2-BE and L2-FE-1 prerequisites complete
 - **Build Status**: All passing (backend + frontend both build cleanly)
+
+### Recent Updates (April 17, 2026)
+
+- **L3-FE-6**: Portfolio trade history on `PortfolioPage` — reuse `TradeHistoryTable` under `PortfolioTrajectoryChart`; `PortfolioBacktestSummary` includes `realizedProfit` and `unrealizedValue` for summary cards.
 
 ---
 
@@ -138,7 +142,7 @@ In short: **Level 1/2 only simulates buy-and-hold DCA**, while **Level 3 simulat
 | L3-FE-3 | **Trade history table** – Table below chart: columns e.g. Date, Type (TP/SL), Price, Amount, Realized Profit. Data from `trades`.                                                                                                                                                                                                                                                                                                                                                                                                             | S     | L3-BE-3                            | Hoàng                               | Done |
 | L3-FE-4 | **Portfolio trigger settings UI** – Add TP/SL controls to portfolio config form and submit `triggers` to `POST /backtest/portfolio` with same validation UX as single-asset.                                                                                                                                                                                                                                                                                                                                                                  | S     | L2-FE-1, L3-FE-1, L3-BE-6          | Kiệt                                | -    |
 | L3-FE-5 | **Portfolio sell markers** – Render TP/SL sell markers on portfolio trajectory chart with tooltip details from `trades[]`.                                                                                                                                                                                                                                                                                                                                                                                                                    | M     | L2-FE-3, L3-BE-6, L3-FE-2          | Quân Huỳnh                          | -    |
-| L3-FE-6 | **Portfolio trade history table** – Show portfolio trade history (Date, TP/SL, Price, Amount, Realized Profit) under the portfolio chart.                                                                                                                                                                                                                                                                                                                                                                                                     | S     | L2-FE-3, L3-BE-6, L3-FE-3          | Kiệt                                | -    |
+| L3-FE-6 | **Portfolio trade history table** – Show portfolio trade history (Date, TP/SL, Price, Amount, Realized Profit) under the portfolio chart.                                                                                                                                                                                                                                                                                                                                                                                                     | S     | L2-FE-3, L3-BE-6, L3-FE-3          | Kiệt                                | Done |
 
 **Definition of done (Level 3):** User can set TP/SL for single-asset (and portfolio where enabled), run backtest, see realized vs unrealized in summary, sell markers on chart, and trade history table.
 

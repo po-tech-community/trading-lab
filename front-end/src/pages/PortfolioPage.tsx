@@ -34,6 +34,7 @@ import CompositionPieChart from "@/pages/portfolio-backtest/CompositionPieChart"
 import AssetBreakdown from "@/pages/portfolio-backtest/AssetBreakdown";
 import { SummaryStatsCards } from "@/pages/dca-backtest/SummaryStatsCards";
 import { PortfolioTrajectoryChart } from "@/pages/dca-backtest/PortfolioTrajectoryChart";
+import { TradeHistoryTable } from "@/pages/dca-backtest/TradeHistoryTable";
 
 export default function PortfolioPage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -94,8 +95,8 @@ export default function PortfolioPage() {
                       0,
                     ),
                     numberOfPurchases: result.summary.numberOfPurchases,
-                    realizedProfit: 0, // TODO: implement for portfolio
-                    unrealizedValue: result.summary.currentValue, // TODO: implement for portfolio
+                    realizedProfit: result.summary.realizedProfit,
+                    unrealizedValue: result.summary.unrealizedValue,
                   }
                 : null
             }
@@ -128,14 +129,17 @@ export default function PortfolioPage() {
           </div>
 
           {chartData.length > 0 ? (
-            <PortfolioTrajectoryChart
-              data={chartData}
-              isFullscreen={false}
-              trades={result?.trades ?? []}
-              onFullscreenChange={() => {}}
-              chartDescription={`Portfolio performance (${chartData.length} points)`}
-              assetLabel="Portfolio"
-            />
+            <>
+              <PortfolioTrajectoryChart
+                data={chartData}
+                isFullscreen={false}
+                trades={result?.trades ?? []}
+                onFullscreenChange={() => {}}
+                chartDescription={`Portfolio performance (${chartData.length} points)`}
+                assetLabel="Portfolio"
+              />
+              <TradeHistoryTable trades={result?.trades ?? []} />
+            </>
           ) : (
             <Card>
               <CardHeader>

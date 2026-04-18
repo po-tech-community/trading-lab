@@ -363,6 +363,7 @@ export function PortfolioTrajectoryChart({
 
                   return (
                     <g>
+                      <title>{markerLabel}</title>
                       {/* Small label above the dot */}
                       <text
                         x={cx}

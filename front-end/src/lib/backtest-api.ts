@@ -105,6 +105,10 @@ export interface PortfolioBacktestSummary {
   currentValue: number;
   totalReturnPercentage: number;
   numberOfPurchases: number;
+  /** Sum of realized P&L from TP/SL sells in this run (0 if no triggers). */
+  realizedProfit: number;
+  /** Holdings value at end of open positions (see backend portfolio summary). */
+  unrealizedValue: number;
   assets: PortfolioAssetBreakdown[];
 }
 
