@@ -27,7 +27,7 @@ This document breaks down the Trading Lab project into **assignable tasks** for 
 | **L1 DCA Backtest**  | Done (4/4)        | Done (3/3)                                        | Complete |
 | **L2 Portfolio DCA** | Done (3/3)        | In progress 1/3 (L2-FE-1 done; L2-FE-2/3 pending) | ~67%     |
 | **L3 Triggers**      | Done (6/6)        | Done (6/6)                                        | Complete |
-| **L4 AI Adapt**      | Not started (0/6) | Not started (0/5)                                 | 0%       |
+| **L4 AI Adapt**      | Not started (0/7) | Not started (0/5)                                 | 0%       |
 | **INFRA**            | Done (1/4)        | N/A                                               | 25%      |
 
 ### Recent Updates (April 18, 2026)
@@ -152,12 +152,40 @@ In short: **Level 1/2 only simulates buy-and-hold DCA**, while **Level 3 simulat
 
 _OpenAI integration and chat with backtest context._
 
+Level 4 concept and implementation note: [level-4-ai-mcp-implementation-guide.md](level-4-ai-mcp-implementation-guide.md)
+
+### Level 4 Delivery Flow (What to build first)
+
+Use this order to deliver product value early:
+
+1. **Step 1: Basic AI answer from current backtest context**
+   - Implement one-shot AI response first (`/ai/analyze`) with summary + trades context.
+   - Goal: user can ask “why result is good/bad” and get grounded explanation.
+2. **Step 2: Chat continuity with memory**
+   - Add chat session/history so follow-up questions work.
+   - Goal: user can ask compare/follow-up questions without retyping context.
+3. **Step 3: MCP setup (registry + policy + trace)**
+   - Add tool discovery, permission policy, and execution logs.
+   - Goal: answers become inspectable and safer.
+4. **Step 4: MCP feature tools + UI evidence cards**
+   - Add concrete tools (market/risk/diagnostics) and show results in chat UI.
+   - Goal: assistant provides evidence-backed recommendations instead of generic text.
+
+### Level 4 User Question Examples
+
+- “Why did this run underperform?”
+- “Which asset contributed most to drawdown?”
+- “Is my stop-loss too aggressive?”
+- “What changed after I adjusted threshold?”
+- “What should I test next: weekly frequency or lower sellAction?”
+
 | ID      | Task                                                                                                                                                                                                                                                        | Scope | Deps             | Assignee | Done |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------- | -------- | ---- |
 | L4-BE-1 | **OpenAI (or Anthropic) integration** – Install SDK; create a service that accepts messages and returns assistant reply. Use env var for API key. Handle rate limits and errors.                                                                            | M     | —                | Dev 4    | -    |
 | L4-BE-2 | **Prompt generator** – Convert backtest result (summary, timeline snippet, trades if any) into a short text context for the LLM. Include: strategy params, key metrics, optional recent timeline points.                                                    | M     | L1-BE-2, L4-BE-1 | Dev 1    | -    |
 | L4-BE-3 | **POST /api/v1/ai/analyze** – Body: `backtestId` (or raw backtest result) and `userQuery`. Build context with prompt generator; call LLM with system prompt (e.g. “You are a DCA strategy advisor”) + user message. Return `{ advice, suggestedActions? }`. | M     | L4-BE-2          | Dev 5    | -    |
-| L4-BE-4 | **Chat session / history** (optional) – Store or manage conversation per backtest/session so user can ask follow-ups with same context.                                                                                                                     | M     | L4-BE-3          | Dev 3    | -    |
+| L4-BE-4 | **Chat session / history** – Store and retrieve conversation per backtest/session so user can ask follow-ups with same context.                                                                                                                             | M     | L4-BE-3          | Dev 3    | -    |
+| L4-BE-7 | **Backtest context persistence for AI** – Persist a compact backtest snapshot (config + summary + key trades, optional sampled timeline) or a backtest result reference id so AI chat can bind to a stable run instead of fire-and-forget payload only.     | M     | L3-BE-6, L4-BE-3 | Dev 5    | -    |
 | L4-BE-5 | **MCP setup & registry** – Set up MCP client runtime, provider registry, tool discovery, environment configuration, and permission policy (allow/deny list + audit metadata). Include timeout/retry defaults and fallback strategy.                         | M     | L4-BE-3          | Dev 4    | -    |
 | L4-BE-6 | **MCP domain tools integration** – Add concrete MCP-powered tools for AI Advisor (market snapshot, portfolio diagnostics, risk checks), map tool outputs into model context, and return tool-backed evidence in final advice payload.                       | L     | L4-BE-5          | Dev 4    | -    |
 | L4-FE-1 | **AI Advisor panel** – Slide-over or modal: “Consult AI Advisor” opens panel. Show current backtest summary in panel header or first message.                                                                                                               | S     | L1-FE-2, L1-FE-3 | Dev 1    | -    |
@@ -187,7 +215,7 @@ _OpenAI integration and chat with backtest context._
 2. **Sprint 1 (MVP):** L1-BE-1 → L1-BE-2 → L1-BE-3 · L1-FE-1, L1-FE-2, L1-FE-3.
 3. **Sprint 2 (Portfolio):** L2-BE-1 → L2-BE-2 → L2-BE-3 · L2-FE-1, L2-FE-2, L2-FE-3.
 4. **Sprint 3 (Triggers):** L3-BE-1 → L3-BE-2 → L3-BE-3, L3-BE-4 → L3-BE-5, L3-BE-6 · L3-FE-1, L3-FE-2, L3-FE-3 → L3-FE-4, L3-FE-5, L3-FE-6.
-5. **Sprint 4 (AI Adapt):** L4-BE-1 → L4-BE-2 → L4-BE-3 → L4-BE-5 (MCP setup) → L4-BE-6 (MCP features) · L4-FE-1, L4-FE-2, L4-FE-3, L4-FE-4 (MCP setup UX), L4-FE-5 (MCP feature UX).
+5. **Sprint 4 (AI Adapt):** L4-BE-1 → L4-BE-2 → L4-BE-3 → L4-BE-4 → L4-BE-7 → L4-BE-5 (MCP setup) → L4-BE-6 (MCP features) · L4-FE-1, L4-FE-2, L4-FE-3, L4-FE-4 (MCP setup UX), L4-FE-5 (MCP feature UX).
 
 INFRA tasks can be scheduled in parallel or in Sprint 0/1.
 
