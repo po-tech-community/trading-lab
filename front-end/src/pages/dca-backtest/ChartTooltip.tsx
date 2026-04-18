@@ -16,6 +16,9 @@ export interface ChartTooltipProps {
   label?: string | number;
   assetLabel?: string;
   tradesByDate?: Map<string, BacktestTrade[]>;
+  valueLabel?: string;
+  investedLabel?: string;
+  showPrice?: boolean;
 }
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -35,6 +38,9 @@ export function ChartTooltip({
   label,
   assetLabel = "Coin",
   tradesByDate,
+  valueLabel = "Portfolio value",
+  investedLabel = "Total invested",
+  showPrice = true,
 }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
 
@@ -70,22 +76,20 @@ export function ChartTooltip({
       ? "$0"
       : `${profit > 0 ? "+" : "-"}$${Math.abs(profit).toLocaleString()}`;
 
-  
   // Sell trades for this hovered date
   const dateKey = String(label).slice(0, 10); // normalise to YYYY-MM-DD
   const tradesOnDate = tradesByDate?.get(dateKey) ?? [];
 
-
   return (
     <div className="bg-background border p-3 rounded-md shadow-sm min-w-[220px]">
       <p className="text-xs text-muted-foreground mb-2">{formattedDate}</p>
- 
+
       {/* Standard portfolio metrics */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-8">
           <span className="text-sm flex items-center gap-2">
             <div className="size-2 rounded-full bg-primary" />
-            Portfolio value
+            {valueLabel}
           </span>
           <span className="text-sm font-semibold text-primary">
             ${value.toLocaleString()}
@@ -94,19 +98,21 @@ export function ChartTooltip({
         <div className="flex items-center justify-between gap-8">
           <span className="text-sm flex items-center gap-2 text-muted-foreground">
             <div className="size-2 rounded-full bg-muted-foreground/40" />
-            Total invested
+            {investedLabel}
           </span>
           <span className="text-sm">${invested.toLocaleString()}</span>
         </div>
-        <div className="flex items-center justify-between gap-8">
-          <span className="text-sm flex items-center gap-2 text-muted-foreground">
-            <div className="size-2 rounded-full bg-amber-500" />
-            {assetLabel} price
-          </span>
-          <span className="text-sm text-amber-600">
-            {close > 0 ? `$${close.toLocaleString()}` : "—"}
-          </span>
-        </div>
+        {showPrice && (
+          <div className="flex items-center justify-between gap-8">
+            <span className="text-sm flex items-center gap-2 text-muted-foreground">
+              <div className="size-2 rounded-full bg-amber-500" />
+              {assetLabel} price
+            </span>
+            <span className="text-sm text-amber-600">
+              {close > 0 ? `$${close.toLocaleString()}` : "—"}
+            </span>
+          </div>
+        )}
         <div className="pt-1.5 mt-1.5 border-t border-border flex items-center justify-between">
           <span className={`text-xs ${profitClass}`}>{profitLabel}</span>
           <span className={`text-xs font-semibold ${profitClass}`}>
@@ -114,7 +120,7 @@ export function ChartTooltip({
           </span>
         </div>
       </div>
- 
+
       {/* Sell trade details — only rendered when a TP/SL fired on this date */}
       {tradesOnDate.length > 0 && (
         <div className="mt-3 pt-3 border-t border-border space-y-2">
@@ -126,7 +132,7 @@ export function ChartTooltip({
             const dotColor = isTp ? "bg-emerald-500" : "bg-rose-500";
             const profitColor =
               trade.profit >= 0 ? "text-emerald-500" : "text-rose-500";
- 
+
             return (
               <div key={i} className="space-y-1">
                 {/* Badge header */}
@@ -138,7 +144,7 @@ export function ChartTooltip({
                     {isTp ? "TAKE PROFIT" : "STOP LOSS"} trigger
                   </span>
                 </div>
- 
+
                 {/* Trade details */}
                 <div className="pl-3.5 space-y-0.5 text-xs">
                   <div className="flex justify-between gap-6">
@@ -163,7 +169,7 @@ export function ChartTooltip({
                     </span>
                   </div>
                 </div>
- 
+
                 {/* Divider between multiple trades on same day */}
                 {i < tradesOnDate.length - 1 && (
                   <div className="border-t border-border/50 pt-1" />
@@ -176,4 +182,3 @@ export function ChartTooltip({
     </div>
   );
 }
- 

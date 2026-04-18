@@ -35,11 +35,18 @@ export interface BacktestTimelinePoint {
 
 export interface BacktestTrade {
   date: number;
-  type: 'takeProfit' | 'stopLoss';
+  type: "takeProfit" | "stopLoss";
   price: number;
   units: number;
   profit: number;
   sellAction: number;
+  assetExecutions?: Array<{
+    symbol: string;
+    price: number;
+    units: number;
+    proceeds: number;
+    profit: number;
+  }>;
 }
 
 export interface RunBacktestResponse {
@@ -80,6 +87,9 @@ export interface RunPortfolioBacktestRequestBody {
 export interface PortfolioTimelineAssetSlice {
   symbol: string;
   units: number;
+  close: number;
+  holdingsValue: number;
+  cashValue: number;
   value: number;
   invested: number;
 }
@@ -105,6 +115,8 @@ export interface PortfolioBacktestSummary {
   currentValue: number;
   totalReturnPercentage: number;
   numberOfPurchases: number;
+  realizedProfit: number;
+  unrealizedValue: number;
   assets: PortfolioAssetBreakdown[];
 }
 

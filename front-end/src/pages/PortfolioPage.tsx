@@ -12,7 +12,7 @@
  *  - Retains mock summary cards as placeholders until L2-FE-3 is done
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -35,6 +35,13 @@ import AssetBreakdown from "@/pages/portfolio-backtest/AssetBreakdown";
 import { SummaryStatsCards } from "@/pages/dca-backtest/SummaryStatsCards";
 import { PortfolioTrajectoryChart } from "@/pages/dca-backtest/PortfolioTrajectoryChart";
 import { TradeHistoryTable } from "@/pages/dca-backtest/TradeHistoryTable";
+
+const ASSET_LABELS: Record<string, string> = {
+  BTC: "Bitcoin",
+  ETH: "Ethereum",
+  AAPL: "Apple",
+  TSLA: "Tesla",
+};
 
 export default function PortfolioPage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -62,6 +69,37 @@ export default function PortfolioPage() {
   }
 
   const chartData = result ? timelineToChartData(result.timeline) : [];
+
+  const assetSeriesOptions = useMemo(() => {
+    if (!result) return [];
+
+    const pointsBySymbol = new Map<
+      string,
+      { date: string; invested: number; value: number; close: number }[]
+    >();
+
+    for (const point of result.timeline) {
+      const date = new Date(point.date).toISOString().slice(0, 10);
+      for (const slice of point.assets) {
+        const existing = pointsBySymbol.get(slice.symbol) ?? [];
+        existing.push({
+          date,
+          invested: slice.invested,
+          value: slice.value,
+          close: slice.close,
+        });
+        pointsBySymbol.set(slice.symbol, existing);
+      }
+    }
+
+    return result.summary.assets
+      .map((asset) => ({
+        symbol: asset.symbol,
+        label: ASSET_LABELS[asset.symbol] ?? asset.symbol,
+        data: pointsBySymbol.get(asset.symbol) ?? [],
+      }))
+      .filter((option) => option.data.length > 0);
+  }, [result]);
 
   return (
     <div className="space-y-6">
@@ -95,8 +133,8 @@ export default function PortfolioPage() {
                       0,
                     ),
                     numberOfPurchases: result.summary.numberOfPurchases,
-                    realizedProfit: 0, // TODO: implement for portfolio
-                    unrealizedValue: result.summary.currentValue, // TODO: implement for portfolio
+                    realizedProfit: result.summary.realizedProfit,
+                    unrealizedValue: result.summary.unrealizedValue,
                   }
                 : null
             }
@@ -137,8 +175,15 @@ export default function PortfolioPage() {
                 onFullscreenChange={() => {}}
                 chartDescription={`Portfolio performance (${chartData.length} points)`}
                 assetLabel="Portfolio"
+                assetSeriesOptions={assetSeriesOptions}
               />
-              <TradeHistoryTable trades={result?.trades ?? []} />
+              <TradeHistoryTable
+                trades={result?.trades ?? []}
+                mode="portfolio"
+                portfolioSymbols={
+                  result?.summary.assets.map((a) => a.symbol) ?? []
+                }
+              />
             </>
           ) : (
             <Card>

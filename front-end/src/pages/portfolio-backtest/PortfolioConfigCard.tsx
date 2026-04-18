@@ -7,7 +7,16 @@
  *  - Submit blocked until weights sum to 100%
  */
 
-import { ChevronLeft, ChevronRight, DollarSign, Settings2, Target, TrendingUp, ShieldAlert } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  HelpCircle,
+  Settings2,
+  Target,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { TriggerConfigSection } from "@/pages/dca-backtest/TriggerConfigSection";
 import {
   Card,
@@ -33,6 +42,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -136,9 +150,7 @@ export function PortfolioConfigCard({
             </Button>
           </div>
           <CardTitle className="text-xl font-bold">Portfolio Config</CardTitle>
-          <CardDescription>
-            Add assets &amp; set weights that sum to 100%
-          </CardDescription>
+          <CardDescription>Tailor your parameters</CardDescription>
         </CardHeader>
 
         {/* ── Collapsed state ── */}
@@ -156,16 +168,27 @@ export function PortfolioConfigCard({
 
         {/* ── Form body ── */}
         <CardContent
-          className={cn("space-y-5 relative pt-0", isCollapsed && "hidden")}
+          className={cn("space-y-4 relative pt-0", isCollapsed && "hidden")}
         >
           <Form {...form}>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <fieldset disabled={isSubmitting} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <fieldset disabled={isSubmitting} className="space-y-2">
                 {/* ── Asset list (L2-FE-1) ── */}
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Assets &amp; Weights
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Assets &amp; Weights
+                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[240px]">
+                        Add portfolio assets and set weights so the total
+                        allocation equals exactly 100%.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <AssetList fieldArrayName="assets" />
                 </div>
 
@@ -177,9 +200,23 @@ export function PortfolioConfigCard({
                   name="totalAmount"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel className="text-xs text-muted-foreground">
-                        Investment amount per period
-                      </FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Investment amount
+                        </FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="right"
+                            className="max-w-[200px]"
+                          >
+                            The fixed amount of USD you will invest in each
+                            period (e.g. $200 every week).
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <div className="relative">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 size-5 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <DollarSign className="size-3.5" />
@@ -189,7 +226,7 @@ export function PortfolioConfigCard({
                             type="number"
                             step="0.01"
                             min={0}
-                            className="pl-10 h-9 font-medium"
+                            className="pl-10 h-10 font-medium"
                             placeholder="200"
                             name={field.name}
                             ref={field.ref}
@@ -218,19 +255,33 @@ export function PortfolioConfigCard({
                   name="frequency"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel className="text-xs text-muted-foreground">
-                        Repeat frequency
-                      </FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Repeat frequency
+                        </FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="right"
+                            className="max-w-[200px]"
+                          >
+                            How often you want to make a purchase. More frequent
+                            buying reduces timing risk.
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-9 font-medium">
+                          <SelectTrigger className="h-10 bg-background/30 border-primary/10 hover:border-primary/30 transition-colors rounded-md font-medium">
                             <SelectValue placeholder="Select frequency" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl border-primary/10">
                           <SelectItem value="daily">Daily</SelectItem>
                           <SelectItem value="weekly">Weekly</SelectItem>
                           <SelectItem value="monthly">Monthly</SelectItem>
@@ -242,23 +293,26 @@ export function PortfolioConfigCard({
                 />
 
                 {/* ── Date range ── */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4 items-start">
                   <FormField
                     control={form.control}
                     name="startDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-2">
+                      <FormItem className="flex flex-col gap-1.5 space-y-0">
                         <FormLabel className="text-xs text-muted-foreground">
                           From
                         </FormLabel>
                         <FormControl>
                           <Input
                             type="date"
-                            className="h-9 text-sm"
+                            className="h-10 text-sm"
+                            max={todayIso}
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
+                        <div className="text-xs leading-snug">
+                          <FormMessage />
+                        </div>
                       </FormItem>
                     )}
                   />
@@ -266,22 +320,31 @@ export function PortfolioConfigCard({
                     control={form.control}
                     name="endDate"
                     render={({ field }) => (
-                      <FormItem className="space-y-2">
+                      <FormItem className="flex flex-col gap-1.5 space-y-0">
                         <FormLabel className="text-xs text-muted-foreground">
                           To
                         </FormLabel>
                         <FormControl>
                           <Input
                             type="date"
-                            className="h-9 text-sm"
+                            className="h-10 text-sm"
+                            max={todayIso}
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
+                        <div className="text-xs leading-snug">
+                          <FormMessage />
+                        </div>
                       </FormItem>
                     )}
                   />
                 </div>
+
+                <p className="text-xs text-amber-600" role="note">
+                  Default range is set to From = 1 year ago and To = today. You
+                  can change it, but the selected range must stay within 365
+                  days.
+                </p>
 
                 {/* ── API submit error ── */}
                 {submitError && (
@@ -290,19 +353,32 @@ export function PortfolioConfigCard({
                   </p>
                 )}
 
-                <Separator />
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Smart Triggers
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Smart triggers (optional)
+                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="size-3.5 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[240px]">
+                        Enable take profit and/or stop loss to simulate
+                        automatic sell actions. Matching trades will appear in
+                        Trade History after running the backtest.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <TriggerConfigSection
                     control={form.control}
                     enabledName="takeProfitEnabled"
                     enabled={takeProfitEnabled}
-                    title="Take Profit"
-                    icon={<TrendingUp className="size-3.5 text-emerald-500" />}
+                    title="Take profit"
+                    icon={
+                      <TrendingUp className="size-4 text-emerald-600 shrink-0" />
+                    }
                     thresholdName="takeProfitThreshold"
-                    thresholdLabel="Trigger at gain (%)"
+                    thresholdLabel="Threshold (% gain)"
                     thresholdMax={1000}
                     sellPercentName="takeProfitSellPercent"
                   />
@@ -310,10 +386,12 @@ export function PortfolioConfigCard({
                     control={form.control}
                     enabledName="stopLossEnabled"
                     enabled={stopLossEnabled}
-                    title="Stop Loss"
-                    icon={<ShieldAlert className="size-3.5 text-rose-500" />}
+                    title="Stop loss"
+                    icon={
+                      <TrendingDown className="size-4 text-rose-600 shrink-0" />
+                    }
                     thresholdName="stopLossThreshold"
-                    thresholdLabel="Trigger at loss (%)"
+                    thresholdLabel="Threshold (% drawdown)"
                     thresholdMax={100}
                     sellPercentName="stopLossSellPercent"
                   />

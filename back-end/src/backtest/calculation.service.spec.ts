@@ -34,10 +34,16 @@ describe('runSingleAssetDcaBacktest', () => {
     expect(result.summary.totalReturnPercentage).toBeCloseTo(58.333333, 5);
     expect(result.timeline[0].costBasisPerUnit).toBeCloseTo(10, 10);
     expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
-    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(
+      0,
+      10,
+    );
     expect(result.timeline[2].costBasisPerUnit).toBeCloseTo(300 / 19, 10);
     expect(result.timeline[2].currentValue).toBeCloseTo(475, 10);
-    expect(result.timeline[2].unrealizedProfitLossPercentage).toBeCloseTo(58.333333, 5);
+    expect(result.timeline[2].unrealizedProfitLossPercentage).toBeCloseTo(
+      58.333333,
+      5,
+    );
   });
 
   it('handles weekly schedule when some calendar days have no prices', () => {
@@ -175,10 +181,16 @@ describe('runPortfolioDcaBacktest', () => {
     expect(result.timeline[1].portfolioValue).toBeCloseTo(300, 5);
     expect(result.timeline[0].costBasisTotal).toBeCloseTo(100, 10);
     expect(result.timeline[0].currentValue).toBeCloseTo(100, 10);
-    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(0, 10);
+    expect(result.timeline[0].unrealizedProfitLossPercentage).toBeCloseTo(
+      0,
+      10,
+    );
     expect(result.timeline[1].costBasisTotal).toBeCloseTo(200, 10);
     expect(result.timeline[1].currentValue).toBeCloseTo(300, 10);
-    expect(result.timeline[1].unrealizedProfitLossPercentage).toBeCloseTo(50, 10);
+    expect(result.timeline[1].unrealizedProfitLossPercentage).toBeCloseTo(
+      50,
+      10,
+    );
   });
 
   it('throws when weights do not sum to 100', () => {
@@ -218,9 +230,17 @@ describe('runPortfolioDcaBacktest', () => {
         endDate: day('2025-01-03'),
       },
     );
-    expect(portfolio.summary.totalInvested).toBeCloseTo(single.summary.totalInvested, 8);
-    expect(portfolio.summary.currentValue).toBeCloseTo(single.summary.currentValue, 8);
-    expect(portfolio.summary.numberOfPurchases).toBe(single.summary.numberOfPurchases);
+    expect(portfolio.summary.totalInvested).toBeCloseTo(
+      single.summary.totalInvested,
+      8,
+    );
+    expect(portfolio.summary.currentValue).toBeCloseTo(
+      single.summary.currentValue,
+      8,
+    );
+    expect(portfolio.summary.numberOfPurchases).toBe(
+      single.summary.numberOfPurchases,
+    );
   });
 
   it('returns realizedProfit=0, unrealizedValue, and empty trades when no triggers', () => {
@@ -240,7 +260,10 @@ describe('runPortfolioDcaBacktest', () => {
     );
     expect(result.trades).toEqual([]);
     expect(result.summary.realizedProfit).toBe(0);
-    expect(result.summary.unrealizedValue).toBeCloseTo(result.summary.currentValue, 8);
+    expect(result.summary.unrealizedValue).toBeCloseTo(
+      result.summary.currentValue,
+      8,
+    );
   });
 
   it('executes portfolio take-profit trigger and records trade', () => {
@@ -269,7 +292,9 @@ describe('runPortfolioDcaBacktest', () => {
     expect(result.trades[0].sellAction).toBe(50);
     expect(result.summary.realizedProfit).toBeGreaterThan(0);
     // After selling 50% of holdings, unrealized value should be less than total current value
-    expect(result.summary.unrealizedValue).toBeLessThan(result.summary.currentValue);
+    expect(result.summary.unrealizedValue).toBeLessThan(
+      result.summary.currentValue,
+    );
   });
 
   it('executes portfolio stop-loss trigger and sells all holdings', () => {
@@ -338,9 +363,18 @@ describe('runPortfolioDcaBacktest', () => {
         triggers,
       },
     );
-    expect(portfolio.summary.realizedProfit).toBeCloseTo(single.summary.realizedProfit, 8);
-    expect(portfolio.summary.unrealizedValue).toBeCloseTo(single.summary.unrealizedValue, 8);
-    expect(portfolio.summary.currentValue).toBeCloseTo(single.summary.currentValue, 8);
+    expect(portfolio.summary.realizedProfit).toBeCloseTo(
+      single.summary.realizedProfit,
+      8,
+    );
+    expect(portfolio.summary.unrealizedValue).toBeCloseTo(
+      single.summary.unrealizedValue,
+      8,
+    );
+    expect(portfolio.summary.currentValue).toBeCloseTo(
+      single.summary.currentValue,
+      8,
+    );
     expect(portfolio.trades).toHaveLength(single.trades.length);
   });
 
@@ -366,9 +400,14 @@ describe('runPortfolioDcaBacktest', () => {
     expect(result.trades).toHaveLength(1);
     expect(result.trades[0].price).toBeCloseTo(20, 8);
     expect(result.trades[0].units).toBeCloseTo(7.5, 8);
+    expect(result.trades[0].assetExecutions).toBeDefined();
+    expect(result.trades[0].assetExecutions).toHaveLength(1);
+    expect(result.trades[0].assetExecutions?.[0].symbol).toBe('BTC');
+    expect(result.trades[0].assetExecutions?.[0].price).toBeCloseTo(20, 8);
+    expect(result.trades[0].assetExecutions?.[0].units).toBeCloseTo(7.5, 8);
     expect(result.timeline[1].costBasisTotal).toBeCloseTo(100, 8);
     expect(result.timeline[1].currentValue).toBeCloseTo(300, 8);
     expect(result.timeline[1].assets[0].units).toBeCloseTo(7.5, 8);
-    expect(result.timeline[1].assets[0].value).toBeCloseTo(150, 8);
+    expect(result.timeline[1].assets[0].value).toBeCloseTo(300, 8);
   });
 });

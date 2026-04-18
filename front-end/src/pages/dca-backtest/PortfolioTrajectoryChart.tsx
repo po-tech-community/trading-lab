@@ -8,7 +8,7 @@ import {
   Line,
   ReferenceDot,
 } from "recharts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -22,6 +22,21 @@ import { cn } from "@/lib/utils";
 import { ChartTooltip } from "./ChartTooltip";
 import type { ChartDataPoint } from "./constants";
 import type { BacktestTrade } from "@/lib/backtest-api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface AssetSeriesOption {
+  symbol: string;
+  label: string;
+  data: ChartDataPoint[];
+}
+
+const ALL_SERIES_VALUE = "__ALL__";
 
 export interface PortfolioTrajectoryChartProps {
   /** Time-series data: date, invested, value */
@@ -36,6 +51,8 @@ export interface PortfolioTrajectoryChartProps {
   chartDescription?: string;
   /** Asset label used in the tooltip, e.g. Bitcoin, Ethereum */
   assetLabel?: string;
+  /** Optional per-asset series for portfolio mode (enables aggregate/asset switcher UI). */
+  assetSeriesOptions?: AssetSeriesOption[];
 }
 
 /**
@@ -49,13 +66,55 @@ export function PortfolioTrajectoryChart({
   onFullscreenChange,
   chartDescription = "Performance visualization",
   assetLabel = "Coin",
+  assetSeriesOptions,
 }: PortfolioTrajectoryChartProps) {
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+  const [selectedSeries, setSelectedSeries] =
+    useState<string>(ALL_SERIES_VALUE);
 
-  const expandedData = data.flatMap((point, index) => {
-    if (index === data.length - 1) return [point];
+  const hasAssetBreakdown = (assetSeriesOptions?.length ?? 0) > 0;
 
-    const next = data[index + 1];
+  useEffect(() => {
+    if (!hasAssetBreakdown) {
+      setSelectedSeries(ALL_SERIES_VALUE);
+      return;
+    }
+
+    if (selectedSeries === ALL_SERIES_VALUE) return;
+
+    const exists = assetSeriesOptions?.some(
+      (option) => option.symbol === selectedSeries,
+    );
+    if (!exists) {
+      setSelectedSeries(ALL_SERIES_VALUE);
+    }
+  }, [assetSeriesOptions, hasAssetBreakdown, selectedSeries]);
+
+  const selectedAssetOption =
+    selectedSeries === ALL_SERIES_VALUE
+      ? undefined
+      : assetSeriesOptions?.find((option) => option.symbol === selectedSeries);
+
+  const activeData = selectedAssetOption ? selectedAssetOption.data : data;
+
+  const tooltipAssetLabel = selectedAssetOption
+    ? selectedAssetOption.label
+    : assetLabel;
+
+  const valueLegendLabel = selectedAssetOption
+    ? `${selectedAssetOption.symbol} value`
+    : "Portfolio value";
+
+  const investedLegendLabel = selectedAssetOption
+    ? `${selectedAssetOption.symbol} invested`
+    : "Total invested";
+
+  const showPriceInTooltip = true;
+
+  const expandedData = activeData.flatMap((point, index) => {
+    if (index === activeData.length - 1) return [point];
+
+    const next = activeData[index + 1];
     const currentDelta = point.value - point.invested;
     const nextDelta = next.value - next.invested;
 
@@ -109,7 +168,7 @@ export function PortfolioTrajectoryChart({
   });
 
   const valueByDay = new Map<string, number>();
-  for (const point of data) {
+  for (const point of activeData) {
     valueByDay.set(point.date, point.value);
   }
 
@@ -134,7 +193,7 @@ export function PortfolioTrajectoryChart({
   /**
    * Build a Map<YYYY-MM-DD, BacktestTrade[]> so the tooltip can look up
    * whether any TP/SL fired on the date the cursor is currently hovering.
-  */
+   */
   const tradesByDate = useMemo(() => {
     const map = new Map<string, BacktestTrade[]>();
     for (const trade of trades) {
@@ -145,7 +204,6 @@ export function PortfolioTrajectoryChart({
     }
     return map;
   }, [trades]);
- 
 
   return (
     <Card
@@ -157,23 +215,43 @@ export function PortfolioTrajectoryChart({
       <CardHeader className="flex flex-row items-center justify-between border-b border-border">
         <div>
           <CardTitle className="text-lg font-semibold">
-            Portfolio trajectory
+            {selectedAssetOption
+              ? `${selectedAssetOption.symbol} trajectory`
+              : "Portfolio trajectory"}
           </CardTitle>
           <CardDescription>{chartDescription}</CardDescription>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {hasAssetBreakdown && (
+            <div className="hidden md:flex items-center gap-2">
+              <Select value={selectedSeries} onValueChange={setSelectedSeries}>
+                <SelectTrigger className="h-8 w-[180px]">
+                  <SelectValue placeholder="Select view" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SERIES_VALUE}>All assets</SelectItem>
+                  {assetSeriesOptions?.map((option) => (
+                    <SelectItem key={option.symbol} value={option.symbol}>
+                      By asset: {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Legend */}
-          <div className="hidden sm:flex items-center gap-4">
+          <div className="hidden xl:flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary" />
               <span className="text-xs text-muted-foreground">
-                Portfolio value
+                {valueLegendLabel}
               </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="h-2 w-2 rounded-md bg-muted-foreground/20" />
               <span className="text-xs text-muted-foreground">
-                Total invested
+                {investedLegendLabel}
               </span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -250,8 +328,11 @@ export function PortfolioTrajectoryChart({
             <RechartsTooltip
               content={
                 <ChartTooltip
-                  assetLabel={assetLabel}
+                  assetLabel={tooltipAssetLabel}
                   tradesByDate={tradesByDate}
+                  valueLabel={valueLegendLabel}
+                  investedLabel={investedLegendLabel}
+                  showPrice={showPriceInTooltip}
                 />
               }
               cursor={{
@@ -264,7 +345,7 @@ export function PortfolioTrajectoryChart({
             <Line
               type="monotone"
               dataKey="value"
-              name="Portfolio value"
+              name={valueLegendLabel}
               stroke="transparent"
               strokeWidth={0}
               legendType="none"
@@ -324,7 +405,7 @@ export function PortfolioTrajectoryChart({
             <Line
               type="stepAfter"
               dataKey="invested"
-              name="Total invested"
+              name={investedLegendLabel}
               stroke="hsl(var(--muted-foreground))"
               strokeWidth={2}
               opacity={0.4}
@@ -410,4 +491,3 @@ export function PortfolioTrajectoryChart({
     </Card>
   );
 }
- 
