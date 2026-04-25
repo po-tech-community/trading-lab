@@ -1,12 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Public } from '../common/decorators/public.decorator';
 import { AnalyzeAiDto, AnalyzeAiResponse } from './dto/analyze-ai.dto';
 import { AiService } from './ai.service';
 
 @ApiTags('ai')
 @Controller('ai')
-@Public()
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 

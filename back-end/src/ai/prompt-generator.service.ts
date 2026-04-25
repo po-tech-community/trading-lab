@@ -56,6 +56,22 @@ export class PromptGeneratorService {
     if (typeof context.summary.unrealizedValue === 'number') {
       lines.push(`- Unrealized value: ${context.summary.unrealizedValue}`);
     }
+    if (context.trades?.length) {
+      lines.push('- Trades sample:');
+      context.trades.forEach((trade, index) => {
+        const profitValue =
+          typeof trade.profit === 'number' ? trade.profit : 'n/a';
+        lines.push(
+          `  ${index + 1}. ${trade.date} | ${trade.type} | price=${trade.price} | profit=${profitValue}`,
+        );
+      });
+    }
+    if (context.timelineSample?.length) {
+      lines.push('- Timeline sample:');
+      context.timelineSample.forEach((point, index) => {
+        lines.push(`  ${index + 1}. ${point.date} | value=${point.value}`);
+      });
+    }
 
     return lines.join('\n');
   }

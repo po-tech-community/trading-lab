@@ -16,6 +16,7 @@ export class AiService {
 
     return {
       advice,
+      // TODO(L4-FE-3): replace static fallback actions with LLM-suggested actions.
       suggestedActions: this.buildSuggestedActions(input),
     };
   }

@@ -55,6 +55,66 @@ class BacktestContextSnapshotDto {
   @ValidateNested()
   @Type(() => BacktestSummaryContextDto)
   summary: BacktestSummaryContextDto;
+
+  @ApiPropertyOptional({
+    type: 'array',
+    description: 'Sampled trades to help explain drawdowns and exits',
+    example: [
+      {
+        date: '2026-04-20T08:00:00.000Z',
+        type: 'SELL',
+        price: 68250.5,
+        profit: 12.4,
+      },
+    ],
+  })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => BacktestTradeContextDto)
+  trades?: BacktestTradeContextDto[];
+
+  @ApiPropertyOptional({
+    type: 'array',
+    description: 'Recent timeline sample (usually last 5-10 points)',
+    example: [
+      { date: '2026-04-20', value: 1200.11 },
+      { date: '2026-04-21', value: 1192.45 },
+    ],
+  })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => BacktestTimelinePointDto)
+  timelineSample?: BacktestTimelinePointDto[];
+}
+
+class BacktestTradeContextDto {
+  @ApiProperty({ example: '2026-04-20T08:00:00.000Z' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ example: 'SELL' })
+  @IsString()
+  @MaxLength(20)
+  type: string;
+
+  @ApiProperty({ example: 68250.5 })
+  @IsNumber()
+  price: number;
+
+  @ApiPropertyOptional({ example: 12.4 })
+  @IsOptional()
+  @IsNumber()
+  profit?: number;
+}
+
+class BacktestTimelinePointDto {
+  @ApiProperty({ example: '2026-04-20' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ example: 1200.11 })
+  @IsNumber()
+  value: number;
 }
 
 export class AnalyzeAiDto {
