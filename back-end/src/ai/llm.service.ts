@@ -26,9 +26,7 @@ export class LlmService {
     userPrompt: string;
   }): Promise<string> {
     if (!this.client) {
-      throw new ServiceUnavailableException(
-        'OPENAI_API_KEY is missing. Configure it in .env to use AI analyze.',
-      );
+      throw new ServiceUnavailableException();
     }
 
     try {
@@ -65,7 +63,7 @@ export class LlmService {
         error instanceof Error ? error.message : 'Unknown provider error';
       this.logger.error(`[OpenAI] completion failed: ${detail}`);
       throw new InternalServerErrorException(
-        `Failed to generate AI analysis response: ${detail}`,
+        'Failed to generate AI analysis response',
       );
     }
   }
