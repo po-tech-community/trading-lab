@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/PageHeader"
 import { AiChatSidebar } from "./ai-chat/Sidebar"
 import { ChatPanel, type ChatMessage } from "./ai-chat/ChatPanel"
+import { analyzeBacktest } from "@/lib/ai-api";
 
 export default function AiChatPage() {
   const [input, setInput] = useState("")
@@ -25,29 +26,38 @@ export default function AiChatPage() {
     }
   }, [messages])
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  const handleSend = async () => {
+  if (!input.trim()) return;
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      text: input,
-      sender: "user",
+  const userMsg: ChatMessage = {
+    id: Date.now().toString(),
+    text: input,
+    sender: "user",
+    timestamp: new Date(),
+  };
+
+  setMessages((prev) => [...prev, userMsg]);
+  setInput("");
+
+  try {
+    const result = await analyzeBacktest({ userQuery: input.trim() });
+    const aiMsg: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      text: result.advice,
+      sender: "ai",
       timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMsg])
-    setInput("")
-
-    setTimeout(() => {
-      const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "I'm processing your request in high-priority mode. (Full-page advisor active).",
-        sender: "ai",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMsg])
-    }, 800)
+    };
+    setMessages((prev) => [...prev, aiMsg]);
+  } catch {
+    const aiMsg: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      text: "Sorry, I couldn't reach the AI advisor right now. Please try again.",
+      sender: "ai",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, aiMsg]);
   }
+};
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
