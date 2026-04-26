@@ -24,6 +24,7 @@ import { UsersModule } from './users/users.module';
 import { TodosModule } from './todos/todos.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { BacktestModule } from './backtest/backtest.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -56,7 +57,8 @@ import { BacktestModule } from './backtest/backtest.module';
     AuthModule,
     UsersModule,
     TodosModule,
-    BacktestModule
+    BacktestModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
