@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ApiError } from "@/lib/api-client";
-import { runBacktest, type RunBacktestResponse } from "@/lib/backtest-api";
+import { runBacktest, type RunBacktestResponse, type RunBacktestRequestBody} from "@/lib/backtest-api";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Minimize2, Maximize2, Zap } from "lucide-react";
@@ -21,6 +21,10 @@ import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards";
 import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart";
 import { timelineToChartData } from "./dca-backtest/timeline-to-chart";
 import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
+
+// L4-FE-1/2/3 — AI Advisor panel + trigger button
+import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
+import type { SuggestedAction } from "@/lib/ai-api";
 
 function formatApiError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -43,6 +47,10 @@ export default function DcaBacktestPage() {
   const [selectedSymbol, setSelectedSymbol] = useState<
     "BTC" | "ETH" | "AAPL" | "TSLA"
   >("BTC");
+
+  const [lastConfig, setLastConfig] = useState<RunBacktestRequestBody | undefined>(undefined);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  
 
   const assetLabelMap: Record<typeof selectedSymbol, string> = {
     BTC: "Bitcoin",
@@ -69,6 +77,15 @@ export default function DcaBacktestPage() {
     ? `Performance over the selected range (${chartData.length} points)`
     : "Run a backtest to see your equity curve";
 
+  const handleSuggestedAction = (action: SuggestedAction) => {
+    setAiPanelOpen(false);
+    setIsSidebarCollapsed(false);
+    toast.info(`Suggested: ${action.label}`, {
+      description: `Update "${action.field}" to "${action.value}" in the strategy config, then re-run.`,
+      duration: 6000,
+    });
+  };
+
   return (
     <TooltipProvider>
       <div
@@ -85,23 +102,34 @@ export default function DcaBacktestPage() {
           title="DCA Backtest"
           description="Analyze the historical performance of recurring investments with our high-precision simulation engine."
           actions={
-            isFullscreen ? (
-              <Button variant="outline" onClick={() => setIsFullscreen(false)}>
-                <Minimize2 className="mr-2 h-4 w-4" />
-                Exit fullscreen
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => setIsFullscreen(true)}>
-                <Maximize2 className="mr-2 h-4 w-4" />
-                Fullscreen
-              </Button>
-            )
+            <div className="flex items-center gap-2">
+              {/* L4-FE-1: "Consult AI Advisor" trigger button */}
+              <AiAdvisorTrigger
+                onClick={() => setAiPanelOpen(true)}
+                hasResult={!!backtestResult}
+              />
+ 
+              {isFullscreen ? (
+                <Button variant="outline" onClick={() => setIsFullscreen(false)}>
+                  <Minimize2 className="mr-2 h-4 w-4" />
+                  Exit fullscreen
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => setIsFullscreen(true)}>
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Fullscreen
+                </Button>
+              )}
+            </div>
           }
         />
 
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           <StrategyConfigCard
-            onSubmit={(body) => mutation.mutate(body)}
+            onSubmit={(body) => {
+              setLastConfig(body);
+              mutation.mutate(body);
+            }}
             onSymbolChange={setSelectedSymbol}
             isSubmitting={mutation.isPending}
             submitError={
@@ -148,6 +176,20 @@ export default function DcaBacktestPage() {
           </div>
         </div>
       </div>
+      <AiAdvisorPanel
+          open={aiPanelOpen}
+          onOpenChange={setAiPanelOpen}
+          summary={backtestResult?.summary ?? null}
+          trades={backtestResult?.trades}
+          config={lastConfig ? {
+            symbol: lastConfig.symbol,
+            amount: lastConfig.amount,
+            frequency: lastConfig.frequency,
+            startDate: lastConfig.startDate,
+            endDate: lastConfig.endDate,
+          } : undefined}
+          onSuggestedAction={handleSuggestedAction}
+        />
     </TooltipProvider>
   );
 }
