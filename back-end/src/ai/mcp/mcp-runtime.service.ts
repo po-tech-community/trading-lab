@@ -250,6 +250,16 @@ export class McpRuntimeService {
       return [];
     }
 
+    const knownProviderIds = ['backtest-context', 'market-snapshot', 'portfolio-diagnostics'];
+    const configuredIds = trace.providers.map((p) => p.providerId);
+    const missing = knownProviderIds.filter((id) => !configuredIds.includes(id));
+    if (missing.length > 0) {
+      this.logger.warn(
+        `MCP providers not configured: ${missing.join(', ')}. ` +
+        'Set MCP_PROVIDERS env var with matching ids for evidence-backed analysis.',
+      );
+    }
+
     const plans: McpToolExecutionPlan[] = [];
 
     this.pushPlanIfAvailable(trace, plans, {
@@ -347,17 +357,6 @@ export class McpRuntimeService {
   private extractSymbols(input: AnalyzeAiDto): string[] {
     const context = input.backtestContext;
     const symbols = new Set<string>();
-    const stopWords = new Set([
-      'DCA',
-      'TP',
-      'SL',
-      'RUN',
-      'TEST',
-      'SELL',
-      'BACKTEST',
-      'PORTFOLIO',
-      'VALUE',
-    ]);
 
     context?.assets?.forEach((asset) => {
       if (asset.symbol) {
@@ -365,17 +364,20 @@ export class McpRuntimeService {
       }
     });
 
-    const combinedText = [context?.title, input.userQuery]
-      .filter(Boolean)
-      .join(' ');
-    const matches = (combinedText.match(/\b[A-Z]{2,6}\b/g) ?? []) as string[];
-
-    matches.forEach((match) => {
-      const normalized = match.toUpperCase();
-      if (!stopWords.has(normalized)) {
-        symbols.add(normalized);
-      }
-    });
+    // Only fall back to heuristic extraction when no explicit asset list is present.
+    if (symbols.size === 0 && context?.title) {
+      const stopWords = new Set([
+        'A', 'AN', 'THE', 'IN', 'ON', 'AT', 'BY', 'TO', 'OF', 'IS', 'MY',
+        'DCA', 'TP', 'SL', 'RUN', 'TEST', 'SELL', 'BUY', 'BACKTEST',
+        'PORTFOLIO', 'VALUE', 'USD', 'PROFIT', 'LOSS', 'RETURN',
+      ]);
+      const matches = (context.title.match(/\b[A-Z]{2,5}\b/g) ?? []) as string[];
+      matches.forEach((match) => {
+        if (!stopWords.has(match)) {
+          symbols.add(match);
+        }
+      });
+    }
 
     return Array.from(symbols);
   }
@@ -454,6 +456,14 @@ export class McpRuntimeService {
         return {
           contentText: JSON.stringify(result.toolResult),
         };
+      }
+
+      if (result.isError) {
+        const errorText = result.content
+          .filter((item) => item.type === 'text')
+          .map((item) => item.text)
+          .join('\n');
+        throw new Error(errorText || `Tool ${toolName} returned isError=true`);
       }
 
       const text = result.content
