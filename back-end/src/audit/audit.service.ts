@@ -11,6 +11,8 @@ export type AuthAuditAction =
   | 'profile_update'
   | 'soft_delete';
 
+export type AiAuditAction = 'mcp_discovery' | 'mcp_tool_execution';
+
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
@@ -28,6 +30,36 @@ export class AuditService {
     const occurredAt = new Date();
     const payload = {
       scope: 'auth_audit',
+      action,
+      userId,
+      timestamp: occurredAt.toISOString(),
+      metadata: metadata ?? null,
+    };
+
+    this.logger.log(JSON.stringify(payload));
+
+    try {
+      await this.auditLogModel.create({
+        action,
+        userId,
+        occurredAt,
+        metadata: metadata ?? null,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown audit persistence error';
+      this.logger.error(`Failed to persist audit log: ${message}`);
+    }
+  }
+
+  async logAiEvent(
+    action: AiAuditAction,
+    userId: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    const occurredAt = new Date();
+    const payload = {
+      scope: 'ai_audit',
       action,
       userId,
       timestamp: occurredAt.toISOString(),
