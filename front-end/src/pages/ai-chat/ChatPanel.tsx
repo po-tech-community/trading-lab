@@ -5,17 +5,19 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { McpExecutionPanel } from "@/components/mcp/McpExecutionPanel";
-import { MarketSnapshotCard, RiskCheckCard, AllocationDiagnosticsCard } from "@/components/mcp/ResultCards";
-import type { ChatMessage } from "@/hooks/use-mcp-chat";
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sender: "user" | "ai";
+  timestamp: Date;
+}
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
-  onMcpApprove?: (id: string) => void;
-  onMcpDeny?: (id: string) => void;
 }
 
 /**
@@ -26,7 +28,7 @@ interface ChatPanelProps {
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
   (
-    { messages, input, onInputChange, onSend, onMcpApprove, onMcpDeny },
+    { messages, input, onInputChange, onSend },
     scrollRef: ForwardedRef<HTMLDivElement>,
   ) => {
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -83,52 +85,15 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                   <User className="size-4" />
                 )}
               </div>
-              <div className="flex-1 space-y-3">
-                <div
-                  className={cn(
-                    "p-4 rounded-2xl text-sm leading-relaxed",
-                    msg.sender === "ai"
-                      ? "bg-card border text-foreground"
-                      : "bg-primary text-primary-foreground",
-                  )}
-                >
-                  {msg.text}
-                </div>
-
-                {msg.mcpExecution && (
-                  <McpExecutionPanel
-                    execution={msg.mcpExecution}
-                    onApprove={onMcpApprove || (() => {})}
-                    onDeny={onMcpDeny || (() => {})}
-                    className="max-w-none"
-                  />
+              <div
+                className={cn(
+                  "p-4 rounded-2xl text-sm leading-relaxed",
+                  msg.sender === "ai"
+                    ? "bg-card border text-foreground"
+                    : "bg-primary text-primary-foreground",
                 )}
-
-                {msg.resultCards && (
-                  <div className="space-y-3">
-                    {msg.resultCards.marketSnapshot && (
-                      <MarketSnapshotCard
-                        data={msg.resultCards.marketSnapshot}
-                        onViewDetails={() => console.log('View market details')}
-                        onAddToWatchlist={() => console.log('Add to watchlist')}
-                      />
-                    )}
-                    {msg.resultCards.riskCheck && (
-                      <RiskCheckCard
-                        data={msg.resultCards.riskCheck}
-                        onViewReport={() => console.log('View risk report')}
-                        onAdjustStrategy={() => console.log('Adjust strategy')}
-                      />
-                    )}
-                    {msg.resultCards.allocationDiagnostics && (
-                      <AllocationDiagnosticsCard
-                        data={msg.resultCards.allocationDiagnostics}
-                        onRebalance={() => console.log('Rebalance portfolio')}
-                        onViewAllocation={() => console.log('View allocation')}
-                      />
-                    )}
-                  </div>
-                )}
+              >
+                {msg.text}
               </div>
             </div>
           ))}
