@@ -6,25 +6,11 @@ import { PromptGeneratorService } from './prompt-generator.service';
 import { LlmService } from './llm.service';
 import { AuthModule } from '../auth/auth.module';
 import { AiRateLimitGuard } from './guards/ai-rate-limit.guard';
-import { AuditModule } from '../audit/audit.module';
-import { McpConfigService } from './mcp/mcp-config.service';
-import { McpPermissionService } from './mcp/mcp-permission.service';
-import { McpProviderRegistry } from './mcp/mcp-provider.registry';
-import { McpRuntimeService } from './mcp/mcp-runtime.service';
 
 @Module({
-  imports: [ConfigModule, AuthModule, AuditModule],
+  imports: [ConfigModule, AuthModule],
   controllers: [AiController],
-  providers: [
-    AiService,
-    PromptGeneratorService,
-    LlmService,
-    AiRateLimitGuard,
-    McpConfigService,
-    McpPermissionService,
-    McpProviderRegistry,
-    McpRuntimeService,
-  ],
+  providers: [AiService, PromptGeneratorService, LlmService, AiRateLimitGuard],
   exports: [AiService],
 })
 export class AiModule {}

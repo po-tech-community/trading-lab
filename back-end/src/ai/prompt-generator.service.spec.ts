@@ -80,38 +80,4 @@ describe('PromptGeneratorService', () => {
     expect(minResult.userPrompt).toContain(minQuery);
     expect(maxResult.userPrompt).toContain(maxQuery);
   });
-
-  it('includes MCP evidence when provided', () => {
-    const result = service.generate(
-      {
-        userQuery: 'What does the tool evidence say?',
-        backtestContext: {
-          mode: 'single',
-          title: 'BTC test',
-          generatedAt: '2026-04-24T12:00:00.000Z',
-          summary: {
-            totalInvested: 1000,
-            currentValue: 1100,
-            totalReturnPercentage: 10,
-          },
-        },
-      },
-      [
-        {
-          source: 'mcp',
-          providerId: 'market-snapshot',
-          providerName: 'Market Snapshot Provider',
-          toolName: 'get_latest_quote',
-          status: 'executed',
-          input: { symbol: 'BTC' },
-          summary: 'BTC latest quote shows price 68420.15 USD.',
-          structuredContent: { symbol: 'BTC', priceUsd: 68420.15 },
-        },
-      ],
-    );
-
-    expect(result.userPrompt).toContain('MCP evidence:');
-    expect(result.userPrompt).toContain('market-snapshot.get_latest_quote');
-    expect(result.userPrompt).toContain('BTC latest quote shows price 68420.15 USD.');
-  });
 });
