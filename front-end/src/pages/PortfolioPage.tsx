@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader";
+import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
 import {
   Card,
   CardContent,
@@ -46,9 +47,8 @@ const ASSET_LABELS: Record<string, string> = {
 export default function PortfolioPage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(
-    null,
-  );
+  const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const mutation = useMutation({
     mutationFn: runPortfolioBacktest,
@@ -106,6 +106,12 @@ export default function PortfolioPage() {
       <PageHeader
         title="Portfolio Backtest"
         description="Build a multi-asset DCA portfolio and simulate its historical performance."
+        actions={
+          <AiAdvisorTrigger
+            onClick={() => setAiPanelOpen(true)}
+            hasResult={!!result}
+          />
+        }
       />
 
       {/* ── Main layout: sidebar + content ── */}
@@ -205,6 +211,27 @@ export default function PortfolioPage() {
           )}
         </div>
       </div>
+
+      <AiAdvisorPanel
+        open={aiPanelOpen}
+        onOpenChange={setAiPanelOpen}
+        mode="portfolio"
+        summary={
+          result
+            ? {
+                totalInvested: result.summary.totalInvested,
+                currentValue: result.summary.currentValue,
+                totalReturnPercentage: result.summary.totalReturnPercentage,
+                totalHoldings: result.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
+                numberOfPurchases: result.summary.numberOfPurchases,
+                realizedProfit: result.summary.realizedProfit,
+                unrealizedValue: result.summary.unrealizedValue,
+              }
+            : null
+        }
+        assets={result?.summary.assets.map((a) => ({ symbol: a.symbol, weight: a.weight })) ?? []}
+        trades={result?.trades}
+      />
     </div>
   );
 }

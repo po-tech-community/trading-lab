@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Minimize2, Maximize2, Zap } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { StrategyConfigCard } from "./dca-backtest/StrategyConfigCard";
+import { StrategyConfigCard, type StrategyConfigCardHandle } from "./dca-backtest/StrategyConfigCard";
 import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards";
 import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart";
 import { timelineToChartData } from "./dca-backtest/timeline-to-chart";
@@ -50,6 +50,7 @@ export default function DcaBacktestPage() {
 
   const [lastConfig, setLastConfig] = useState<RunBacktestRequestBody | undefined>(undefined);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const strategyCardRef = useRef<StrategyConfigCardHandle>(null);
   
 
   const assetLabelMap: Record<typeof selectedSymbol, string> = {
@@ -80,9 +81,10 @@ export default function DcaBacktestPage() {
   const handleSuggestedAction = (action: SuggestedAction) => {
     setAiPanelOpen(false);
     setIsSidebarCollapsed(false);
-    toast.info(`Suggested: ${action.label}`, {
-      description: `Update "${action.field}" to "${action.value}" in the strategy config, then re-run.`,
-      duration: 6000,
+    strategyCardRef.current?.applyField(action.field as never, action.value as never);
+    toast.success(`Applied: ${action.label}`, {
+      description: "Form updated — review the change and re-run the backtest.",
+      duration: 4000,
     });
   };
 
@@ -126,6 +128,7 @@ export default function DcaBacktestPage() {
 
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           <StrategyConfigCard
+            ref={strategyCardRef}
             onSubmit={(body) => {
               setLastConfig(body);
               mutation.mutate(body);

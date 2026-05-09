@@ -111,6 +111,8 @@ interface Message {
 export interface ChatProps {
   summary: BacktestSummary | null;
   trades?: BacktestTrade[];
+  mode?: "single" | "portfolio";
+  assets?: Array<{ symbol: string; weight: number }>;
   config?: {
     symbol?: string;
     amount?: number;
@@ -134,6 +136,8 @@ export function AiAdvisorPanel({
   onOpenChange,
   summary,
   trades,
+  mode,
+  assets,
   config,
   onSuggestedAction,
 }: AiAdvisorPanelProps) {
@@ -168,22 +172,32 @@ export function AiAdvisorPanel({
  
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
- 
+
     const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text.trim() };
     const loadingMsg: Message = { id: `loading-${Date.now()}`, role: "assistant", content: "", isLoading: true };
- 
+
+    // Build conversation history before updating state (Fix #1)
+    const history = messages
+      .filter((m) => !m.isLoading && m.id !== "welcome")
+      .slice(-6)
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n");
+    const queryWithHistory = history
+      ? `Previous conversation:\n${history}\n\nUser: ${text.trim()}`
+      : text.trim();
+
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
     setInput("");
     setIsLoading(true);
- 
+
     try {
       const result: AiAnalyzeResponse = await analyzeBacktest({
-        userQuery: text.trim(),
+        userQuery: queryWithHistory,
         backtestContext: summary
-          ? buildBacktestContext(summary, trades, config)  // ← correct arg order
+          ? buildBacktestContext(summary, trades, { ...config, mode, assets })
           : undefined,
       });
- 
+
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
@@ -197,14 +211,21 @@ export function AiAdvisorPanel({
             : m,
         ),
       );
-    } catch {
+    } catch (err) {
+      // Fix #3: distinguish common HTTP error codes
+      const status = (err as { status?: number }).status;
+      const errorContent =
+        status === 401 ? "Please log in to use the AI advisor." :
+        status === 429 ? "Too many requests. Please wait a moment before trying again." :
+        status === 503 ? "AI service is not configured. Please contact the administrator." :
+        "Sorry, I couldn't reach the AI advisor right now. Please try again.";
       setMessages((prev) =>
         prev.map((m) =>
           m.isLoading
             ? {
                 ...m,
                 id: `err-${Date.now()}`,
-                content: "Sorry, I couldn't reach the AI advisor right now. Please try again.",
+                content: errorContent,
                 isLoading: false,
               }
             : m,

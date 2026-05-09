@@ -6,12 +6,48 @@ import { PageHeader } from "@/components/common/PageHeader"
 import { AiChatSidebar } from "./ai-chat/Sidebar"
 import { ChatPanel } from "./ai-chat/ChatPanel"
 import { useMcpChat } from "@/hooks/use-mcp-chat"
-import { analyzeBacktest } from "@/lib/ai-api";
+import {
+  analyzeBacktest,
+  mcpInspect,
+  mcpExecute,
+  evidenceToCards,
+  type McpPlannedTool,
+} from "@/lib/ai-api";
+
+// Tracks the in-flight approval session across approve/deny callbacks.
+interface PendingSession {
+  userQuery: string;
+  // decisions keyed by executionId from useMcpChat
+  decisions: Map<string, {
+    providerId: string;
+    toolName: string;
+    approved: boolean | null;
+  }>;
+}
+
+/**
+ * Build a compact inputPreview for McpExecutionPanel.
+ * Strips the full backtestContext blob (too large for UI) and shows just the mode/title.
+ */
+function buildInputPreview(tool: McpPlannedTool): Record<string, unknown> {
+  const preview: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(tool.input)) {
+    if (k === "backtestContext" && v && typeof v === "object") {
+      const ctx = v as Record<string, unknown>;
+      preview.backtestContext = { mode: ctx.mode, title: ctx.title };
+    } else {
+      preview[k] = v;
+    }
+  }
+  return preview;
+}
 
 export default function AiChatPage() {
   const [input, setInput] = useState("")
+  const [isSending, setIsSending] = useState(false)
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const pendingRef = useRef<PendingSession | null>(null)
 
   const {
     messages,
@@ -22,10 +58,12 @@ export default function AiChatPage() {
     addResultCards,
   } = useMcpChat()
 
-  // Initialize with welcome message
   useEffect(() => {
     if (messages.length === 0) {
-      addTextMessage("Welcome to the Fullscreen AI Advisor! How can I help you analyze the markets today?", "ai")
+      addTextMessage(
+        "Welcome to the AI Advisor Studio. Ask me anything about your DCA backtest strategy.",
+        "ai",
+      )
     }
   }, [messages.length, addTextMessage])
 
@@ -35,140 +73,106 @@ export default function AiChatPage() {
     }
   }, [messages])
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  // ── Step 2: execute approved tools once all decisions are in ─────────────────
 
-    addTextMessage(input, "user");
-    setInput("");
+  const runAfterDecisions = async () => {
+    const session = pendingRef.current
+    if (!session) return
 
-    // MCP Demo Workflow
-    if (input.toLowerCase().includes("analyze market")) {
-      // Add AI response
-      addTextMessage("I'll analyze the current market conditions for you. This requires accessing real-time market data.", "ai");
+    const allDecided = [...session.decisions.values()].every(
+      (d) => d.approved !== null,
+    )
+    if (!allDecided) return
 
-      // Add MCP execution request
-      const executionId = addMcpExecution({
-        toolName: "Market Data Fetcher",
-        purpose: "Retrieve real-time market data for AAPL, MSFT, and GOOGL",
-        inputPreview: {
-          symbols: ["AAPL", "MSFT", "GOOGL"],
-          timeframe: "1D",
-          includeFundamentals: true
-        },
-        status: "pending"
-      });
+    const approvedTools = [...session.decisions.values()]
+      .filter((d) => d.approved)
+      .map(({ providerId, toolName }) => ({ providerId, toolName }))
 
-      // Simulate approval timeout for demo
-      setTimeout(() => {
-        if (executionId) {
-          handleMcpApprove(executionId);
-        }
-      }, 2000);
+    pendingRef.current = null
 
-    } else if (input.toLowerCase().includes("risk assessment")) {
-      addTextMessage("Let me perform a comprehensive risk assessment of your portfolio.", "ai");
+    try {
+      const result =
+        approvedTools.length > 0
+          ? await mcpExecute({ userQuery: session.userQuery, approvedTools })
+          : await analyzeBacktest({ userQuery: session.userQuery })
 
-      const executionId = addMcpExecution({
-        toolName: "Risk Analyzer",
-        purpose: "Calculate portfolio risk metrics including volatility, Sharpe ratio, and VaR",
-        inputPreview: {
-          portfolio: ["AAPL", "MSFT", "GOOGL"],
-          weights: [0.4, 0.3, 0.3],
-          benchmark: "SPY"
-        },
-        status: "pending"
-      });
+      const cards = result.evidence ? evidenceToCards(result.evidence) : undefined
+      if (cards) addResultCards(cards)
 
-      setTimeout(() => {
-        if (executionId) {
-          handleMcpApprove(executionId);
-        }
-      }, 2000);
-
-    } else if (input.toLowerCase().includes("rebalance")) {
-      addTextMessage("I'll check your portfolio allocation and suggest rebalancing actions.", "ai");
-
-      const executionId = addMcpExecution({
-        toolName: "Portfolio Optimizer",
-        purpose: "Analyze current allocation vs target and generate rebalancing trades",
-        inputPreview: {
-          currentHoldings: { AAPL: 100, MSFT: 50, GOOGL: 75 },
-          targetAllocation: { AAPL: 0.35, MSFT: 0.35, GOOGL: 0.30 },
-          totalValue: 50000
-        },
-        status: "pending"
-      });
-
-      setTimeout(() => {
-        if (executionId) {
-          handleMcpApprove(executionId);
-        }
-      }, 2000);
-
-    } else {
-      try {
-        const result = await analyzeBacktest({ userQuery: input.trim() });
-        addTextMessage(result.advice, "ai");
-      } catch {
-        addTextMessage("Sorry, I couldn't reach the AI advisor right now. Please try again.", "ai");
-      }
+      addTextMessage(result.advice, "ai")
+    } catch {
+      addTextMessage("Analysis failed. Please try again.", "ai")
     }
-  };
+  }
+
+  // ── Step 1: inspect tools, show approval panels ───────────────────────────────
+
+  const handleSend = async () => {
+    if (!input.trim() || isSending) return
+
+    const query = input.trim()
+    setInput("")
+    setIsSending(true)
+    addTextMessage(query, "user")
+
+    try {
+      const inspection = await mcpInspect({ userQuery: query })
+
+      if (inspection.plannedTools.length === 0) {
+        // MCP not configured → plain LLM analyze
+        const result = await analyzeBacktest({ userQuery: query })
+        addTextMessage(result.advice, "ai")
+        return
+      }
+
+      const toolCount = inspection.plannedTools.length
+      addTextMessage(
+        `To answer your question I need to run ${toolCount} analysis tool${toolCount > 1 ? "s" : ""}. Please review and approve below:`,
+        "ai",
+      )
+
+      pendingRef.current = { userQuery: query, decisions: new Map() }
+
+      for (const tool of inspection.plannedTools) {
+        const executionId = addMcpExecution({
+          toolName: tool.title ?? tool.toolName,
+          purpose: tool.description ?? `Run ${tool.toolName} from ${tool.providerName}`,
+          inputPreview: buildInputPreview(tool),
+          status: "pending",
+        })
+        pendingRef.current.decisions.set(executionId, {
+          providerId: tool.providerId,
+          toolName: tool.toolName,
+          approved: null,
+        })
+      }
+    } catch {
+      addTextMessage(
+        "Sorry, I couldn't reach the AI advisor right now. Please try again.",
+        "ai",
+      )
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   const handleMcpApprove = (id: string) => {
-    approveMcpExecution(id);
-
-    // Simulate results after execution completes
-    setTimeout(() => {
-      // Mock market data results
-      addResultCards({
-        marketSnapshot: {
-          symbol: "AAPL",
-          price: 175.43,
-          change: 2.15,
-          changePercent: 1.24,
-          volume: 52847392,
-          marketCap: 2750000000000,
-          peRatio: 28.5,
-          dividendYield: 0.82
-        }
-      });
-
-      addTextMessage("Market analysis complete! I've also prepared a risk assessment and portfolio rebalancing recommendation.", "ai");
-
-      // Add risk check results
-      addResultCards({
-        riskCheck: {
-          overallRisk: "medium",
-          volatility: 18.5,
-          sharpeRatio: 1.85,
-          maxDrawdown: -12.3,
-          beta: 1.15,
-          var95: -8.7,
-          stressTestResult: "Portfolio passed stress test with acceptable losses"
-        }
-      });
-
-      // Add allocation diagnostics
-      addResultCards({
-        allocationDiagnostics: {
-          currentAllocation: { AAPL: 0.45, MSFT: 0.35, GOOGL: 0.20 },
-          targetAllocation: { AAPL: 0.35, MSFT: 0.35, GOOGL: 0.30 },
-          rebalanceNeeded: true,
-          driftAmount: 15.2,
-          suggestedTrades: [
-            { symbol: "AAPL", action: "sell", shares: 25, estimatedValue: 4375 },
-            { symbol: "GOOGL", action: "buy", shares: 15, estimatedValue: 2250 }
-          ]
-        }
-      });
-    }, 3000);
-  };
+    approveMcpExecution(id)
+    const decision = pendingRef.current?.decisions.get(id)
+    if (decision) {
+      decision.approved = true
+      void runAfterDecisions()
+    }
+  }
 
   const handleMcpDeny = (id: string) => {
-    denyMcpExecution(id);
-    addTextMessage("Tool execution denied. Let me know if you'd like to try a different analysis.", "ai");
-  };
+    denyMcpExecution(id)
+    const decision = pendingRef.current?.decisions.get(id)
+    if (decision) {
+      decision.approved = false
+      void runAfterDecisions()
+    }
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -188,10 +192,8 @@ export default function AiChatPage() {
       />
 
       <div className="flex-1 flex gap-8 min-h-0">
-        {/* Sidebar / history (mock) */}
         <AiChatSidebar />
 
-        {/* Main chat interface */}
         <ChatPanel
           ref={scrollRef}
           messages={messages}
@@ -200,6 +202,7 @@ export default function AiChatPage() {
           onSend={handleSend}
           onMcpApprove={handleMcpApprove}
           onMcpDeny={handleMcpDeny}
+          isSending={isSending}
         />
       </div>
     </div>

@@ -14,7 +14,9 @@ import {
   McpDiscoveredTool,
   McpExecutionBundle,
   McpExecutionEvidence,
+  McpInspectBundle,
   McpInspectionTrace,
+  McpPlannedTool,
   McpProviderConfig,
   McpProviderDiscoveryTrace,
 } from './mcp.types';
@@ -153,6 +155,76 @@ export class McpRuntimeService {
       }
 
       evidence.push(await this.executeToolPlan(actor.userId, provider, discoveredTool, plan));
+    }
+
+    return { trace, evidence };
+  }
+
+  async inspectWithPlans(
+    actor: McpInspectionActor,
+    userQuery: string,
+    input: AnalyzeAiDto,
+  ): Promise<McpInspectBundle> {
+    const trace = await this.inspectTools(actor, userQuery);
+    const plans = this.buildExecutionPlans(input, trace);
+
+    const plannedTools: McpPlannedTool[] = plans.map((plan) => {
+      const tool = trace.tools.find(
+        (t) => t.providerId === plan.providerId && t.name === plan.toolName,
+      );
+      return {
+        providerId: plan.providerId,
+        providerName: tool?.providerName ?? plan.providerId,
+        toolName: plan.toolName,
+        title: tool?.title,
+        description: tool?.description,
+        readOnly: tool?.readOnly ?? true,
+        destructive: tool?.destructive ?? false,
+        input: plan.input,
+      };
+    });
+
+    return { trace, plannedTools };
+  }
+
+  async executeApproved(
+    actor: McpInspectionActor,
+    userQuery: string,
+    input: AnalyzeAiDto,
+    approvedTools: Array<{ providerId: string; toolName: string }>,
+  ): Promise<McpExecutionBundle> {
+    const trace = await this.inspectTools(actor, userQuery);
+    const allPlans = this.buildExecutionPlans(input, trace);
+
+    const approvedPlans = allPlans.filter((plan) =>
+      approvedTools.some(
+        (a) => a.providerId === plan.providerId && a.toolName === plan.toolName,
+      ),
+    );
+
+    if (approvedPlans.length === 0) {
+      return { trace, evidence: [] };
+    }
+
+    const evidence: McpExecutionEvidence[] = [];
+    for (const plan of approvedPlans) {
+      const provider = this.mcpProviderRegistry
+        .listEnabledProviders()
+        .find((p) => p.id === plan.providerId);
+      const discoveredTool = trace.tools.find(
+        (t) =>
+          t.providerId === plan.providerId &&
+          t.name === plan.toolName &&
+          t.allowed,
+      );
+
+      if (!provider || !discoveredTool) {
+        continue;
+      }
+
+      evidence.push(
+        await this.executeToolPlan(actor.userId, provider, discoveredTool, plan),
+      );
     }
 
     return { trace, evidence };

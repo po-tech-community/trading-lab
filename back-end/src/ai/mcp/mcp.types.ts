@@ -103,3 +103,19 @@ export interface McpExecutionBundle {
   trace: McpInspectionTrace;
   evidence: McpExecutionEvidence[];
 }
+
+export interface McpPlannedTool {
+  providerId: string;
+  providerName: string;
+  toolName: string;
+  title?: string;
+  description?: string;
+  readOnly: boolean;
+  destructive: boolean;
+  input: Record<string, unknown>;
+}
+
+export interface McpInspectBundle {
+  trace: McpInspectionTrace;
+  plannedTools: McpPlannedTool[];
+}

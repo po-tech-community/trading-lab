@@ -39,7 +39,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { useForm } from "react-hook-form";
 import {
   backtestFormSchema,
@@ -51,6 +51,11 @@ import {
 import type { RunBacktestRequestBody } from "@/lib/backtest-api";
 import { toast } from "sonner";
 import { TriggerConfigSection } from "./TriggerConfigSection";
+
+export interface StrategyConfigCardHandle {
+  /** Apply a single field value from an AI suggested action */
+  applyField: (field: keyof BacktestFormValues, value: BacktestFormValues[keyof BacktestFormValues]) => void;
+}
 
 export interface StrategyConfigCardProps {
   /** Called with validated payload (epoch ms dates). */
@@ -66,14 +71,14 @@ export interface StrategyConfigCardProps {
  * Left sidebar card: strategy parameters (asset, amount, frequency, date range).
  * Collapsible on small screens to give more space to the chart.
  */
-export function StrategyConfigCard({
+export const StrategyConfigCard = forwardRef<StrategyConfigCardHandle, StrategyConfigCardProps>(function StrategyConfigCard({
   onSubmit,
   onSymbolChange,
   isSubmitting = false,
   submitError,
   isCollapsed,
   onCollapsedChange,
-}: StrategyConfigCardProps) {
+}, ref) {
   const todayIso = getTodayUtcIsoDate();
   const oneYearAgoIso = getCryptoMinUtcIsoDate();
   const defaultStart = oneYearAgoIso > "" ? oneYearAgoIso : "2023-01-01";
@@ -97,6 +102,12 @@ export function StrategyConfigCard({
       stopLossSellPercent: 100,
     },
   });
+
+  useImperativeHandle(ref, () => ({
+    applyField: (field, value) => {
+      form.setValue(field, value as never, { shouldValidate: true, shouldDirty: true });
+    },
+  }));
 
   const selectedSymbol = form.watch("symbol");
   const takeProfitEnabled = form.watch("takeProfitEnabled");
@@ -465,4 +476,4 @@ export function StrategyConfigCard({
       <div className="absolute bottom-0 left-0 w-full h-px bg-border" />
     </Card>
   );
-}
+});

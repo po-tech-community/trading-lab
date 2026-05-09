@@ -6,7 +6,13 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { AnalyzeAiDto, AnalyzeAiResponse } from './dto/analyze-ai.dto';
+import {
+  AnalyzeAiDto,
+  AnalyzeAiResponse,
+  McpExecuteDto,
+  McpInspectDto,
+  McpInspectResponse,
+} from './dto/analyze-ai.dto';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from './guards/ai-rate-limit.guard';
@@ -102,6 +108,84 @@ export class AiController {
     @CurrentUser() user: JwtPayload,
   ): Promise<AnalyzeAiResponse> {
     return this.aiService.analyze(body, {
+      userId: user.sub,
+      email: user.email,
+    });
+  }
+
+  @Post('mcp/inspect')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Discover MCP tools and preview execution plan — no tools are run',
+    description:
+      'Returns the list of MCP tools that would be invoked for this query, ' +
+      'along with permission decisions. Use the returned plannedTools to build ' +
+      'the approval UI, then call POST /ai/mcp/execute with the approved subset.',
+  })
+  @ApiBody({ type: McpInspectDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Tool inspection completed. No tools were executed.',
+    schema: {
+      example: {
+        trace: {
+          enabled: true,
+          status: 'ready',
+          fallbackStrategy: 'llm_only',
+          timeoutMs: 8000,
+          retryAttempts: 2,
+          providers: [],
+          tools: [],
+          audit: { scope: 'mcp_audit', actorUserId: 'user_123', occurredAt: '2026-05-10T00:00:00.000Z', fallbackUsed: false },
+        },
+        plannedTools: [
+          {
+            providerId: 'backtest-context',
+            providerName: 'Backtest Context Provider',
+            toolName: 'evaluate_risk_profile',
+            title: 'Evaluate Risk Profile',
+            description: 'Classifies this run as low/medium/high risk.',
+            readOnly: true,
+            destructive: false,
+            input: { backtestContext: { mode: 'single' } },
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 429, description: 'Too many AI analyze requests. Please retry later.' })
+  async inspect(
+    @Body() body: McpInspectDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<McpInspectResponse> {
+    return this.aiService.inspect(body, {
+      userId: user.sub,
+      email: user.email,
+    });
+  }
+
+  @Post('mcp/execute')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Execute user-approved MCP tools and return AI advice with evidence',
+    description:
+      'Runs only the tools listed in approvedTools (a subset of what ' +
+      'POST /ai/mcp/inspect returned). Denied tools are skipped. ' +
+      'Returns the same shape as POST /ai/analyze.',
+  })
+  @ApiBody({ type: McpExecuteDto })
+  @ApiResponse({
+    status: 201,
+    description: 'AI advice generated from approved MCP tool evidence.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 429, description: 'Too many AI analyze requests. Please retry later.' })
+  async executeApproved(
+    @Body() body: McpExecuteDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<AnalyzeAiResponse> {
+    return this.aiService.executeApproved(body, {
       userId: user.sub,
       email: user.email,
     });

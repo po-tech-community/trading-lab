@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsIn,
   IsNumber,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import type { McpInspectBundle } from '../mcp/mcp.types';
 
 class BacktestSummaryContextDto {
   @ApiProperty({ example: 1200.5 })
@@ -314,4 +316,95 @@ export interface AnalyzeAiResponse {
   suggestedActions?: string[];
   mcp?: AnalyzeAiMcpTraceDto;
   evidence?: AnalyzeAiEvidenceDto[];
+}
+
+// ── MCP Inspect ──────────────────────────────────────────────────────────────
+
+export class McpInspectDto {
+  @ApiProperty({
+    example: 'Which asset dragged down my portfolio the most?',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(2000)
+  userQuery: string;
+
+  @ApiPropertyOptional({ type: () => Object })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BacktestContextSnapshotDto)
+  backtestContext?: BacktestContextSnapshotDto;
+}
+
+class McpPlannedToolDto {
+  @ApiProperty({ example: 'backtest-context' })
+  providerId: string;
+
+  @ApiProperty({ example: 'Backtest Context Provider' })
+  providerName: string;
+
+  @ApiProperty({ example: 'evaluate_risk_profile' })
+  toolName: string;
+
+  @ApiPropertyOptional({ example: 'Evaluate Risk Profile' })
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Classifies this run as low/medium/high risk.' })
+  description?: string;
+
+  @ApiProperty({ example: true })
+  readOnly: boolean;
+
+  @ApiProperty({ example: false })
+  destructive: boolean;
+
+  @ApiProperty({ type: 'object', additionalProperties: true })
+  input: Record<string, unknown>;
+}
+
+export interface McpInspectResponse {
+  trace: AnalyzeAiMcpTraceDto;
+  plannedTools: McpPlannedToolDto[];
+}
+
+// Map the domain bundle to the response shape (trace types are compatible).
+export function toMcpInspectResponse(bundle: McpInspectBundle): McpInspectResponse {
+  return bundle as unknown as McpInspectResponse;
+}
+
+// ── MCP Execute (with user approval) ─────────────────────────────────────────
+
+class McpApprovedToolDto {
+  @ApiProperty({ example: 'backtest-context' })
+  @IsString()
+  providerId: string;
+
+  @ApiProperty({ example: 'evaluate_risk_profile' })
+  @IsString()
+  toolName: string;
+}
+
+export class McpExecuteDto {
+  @ApiProperty({
+    example: 'Which asset dragged down my portfolio the most?',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(2000)
+  userQuery: string;
+
+  @ApiPropertyOptional({ type: () => Object })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BacktestContextSnapshotDto)
+  backtestContext?: BacktestContextSnapshotDto;
+
+  @ApiProperty({
+    type: [McpApprovedToolDto],
+    description: 'Subset of planned tools the user has approved to execute.',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => McpApprovedToolDto)
+  approvedTools: McpApprovedToolDto[];
 }

@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import type { ForwardedRef, KeyboardEvent } from "react";
-import { Bot, User, Send } from "lucide-react";
+import { Bot, User, Send, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ interface ChatPanelProps {
   onSend: () => void;
   onMcpApprove?: (id: string) => void;
   onMcpDeny?: (id: string) => void;
+  isSending?: boolean;
 }
 
 /**
@@ -26,7 +27,7 @@ interface ChatPanelProps {
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
   (
-    { messages, input, onInputChange, onSend, onMcpApprove, onMcpDeny },
+    { messages, input, onInputChange, onSend, onMcpApprove, onMcpDeny, isSending = false },
     scrollRef: ForwardedRef<HTMLDivElement>,
   ) => {
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -142,6 +143,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask your AI Advisor anything..."
+              disabled={isSending}
               className="min-w-0 flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-l-md rounded-r-none h-9"
             />
             <Button
@@ -149,8 +151,13 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
               size="icon"
               className="size-9 shrink-0 rounded-l-none"
               onClick={onSend}
+              disabled={isSending}
             >
-              <Send className="size-4" />
+              {isSending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
             </Button>
           </div>
           <p className="text-xs text-center mt-3 text-muted-foreground">

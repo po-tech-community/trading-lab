@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react"
-import { MessageSquare, X, Maximize2, Send, Bot, Sparkles, User } from "lucide-react"
+import { MessageSquare, X, Maximize2, Send, Bot, Sparkles, User, Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { analyzeBacktest } from "@/lib/ai-api"
 
 interface Message {
   id: string
@@ -12,36 +13,17 @@ interface Message {
   timestamp: Date
 }
 
-/** Mock quick questions and canned responses for demo/testing */
-const QUICK_QUESTIONS: { question: string; response: string }[] = [
-  {
-    question: "What is DCA?",
-    response:
-      "DCA (Dollar Cost Averaging) means investing a fixed amount at regular intervals (e.g. $100 every week). It reduces the impact of volatility and avoids trying to time the market. Use the DCA Backtest page to see how it would have performed historically.",
-  },
-  {
-    question: "Best time to invest?",
-    response:
-      "With DCA, you don't need to pick the 'best' time—you spread purchases over time. For backtests, we use the date range you set. In practice, starting earlier and staying consistent usually matters more than timing.",
-  },
-  {
-    question: "Analyze my portfolio",
-    response:
-      "Portfolio analysis is coming soon. For now you can use the Portfolio page to view your holdings and the DCA Backtest to simulate strategy performance. Connect your accounts when the feature is available.",
-  },
-  {
-    question: "Is BTC a good DCA target?",
-    response:
-      "Bitcoin has been a common DCA choice due to high volatility and long-term growth in backtests. Past performance doesn't guarantee future results. Consider your risk tolerance and combine with other assets if needed.",
-  },
+const QUICK_QUESTIONS = [
+  "What is DCA?",
+  "Best time to invest?",
+  "Is BTC a good DCA target?",
+  "How does stop-loss affect DCA returns?",
 ]
-
-const DEFAULT_MOCK_RESPONSE =
-  "I'm analyzing your request... (This is a mock response from your AI Advisor)."
 
 export function FloatingAiChat() {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -59,37 +41,45 @@ export function FloatingAiChat() {
     }
   }, [messages, isOpen])
 
-  /** Send a user message and add a mock AI reply (optional canned response). */
-  const sendMessage = (userText: string, mockResponse?: string) => {
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      text: userText,
-      sender: "user",
-      timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMsg])
+  const addMessage = (text: string, sender: "user" | "ai") => {
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString(), text, sender, timestamp: new Date() },
+    ])
+  }
 
-    const reply = mockResponse ?? DEFAULT_MOCK_RESPONSE
-    setTimeout(() => {
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        text: reply,
-        sender: "ai",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMsg])
-    }, 800)
+  const sendMessage = async (userText: string) => {
+    addMessage(userText, "user")
+    setIsLoading(true)
+    try {
+      const result = await analyzeBacktest({ userQuery: userText })
+      addMessage(result.advice, "ai")
+    } catch (err) {
+      console.error("[FloatingAiChat] analyzeBacktest failed:", err)
+      const status = (err as { status?: number }).status
+      const msg =
+        status === 401
+          ? "Please log in to use the AI Advisor."
+          : status === 429
+            ? "Too many requests. Please wait a moment and try again."
+            : status === 503
+              ? "AI service is not configured (missing API key)."
+              : "Sorry, I couldn't reach the AI advisor right now. Please try again."
+      addMessage(msg, "ai")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSend = () => {
-    if (!input.trim()) return
+    if (!input.trim() || isLoading) return
     const text = input.trim()
     setInput("")
-    sendMessage(text)
+    void sendMessage(text)
   }
 
-  const handleQuickQuestion = (item: (typeof QUICK_QUESTIONS)[number]) => {
-    sendMessage(item.question, item.response)
+  const handleQuickQuestion = (question: string) => {
+    void sendMessage(question)
   }
 
   const handleExpand = () => {
@@ -177,19 +167,20 @@ export function FloatingAiChat() {
             ))}
           </div>
 
-          {/* Quick questions (mock): single row, scroll horizontally */}
+          {/* Quick questions */}
           <div className="px-4 pb-2 border-t pt-3">
             <p className="text-xs text-muted-foreground mb-2">Quick questions</p>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-              {QUICK_QUESTIONS.map((item) => (
+              {QUICK_QUESTIONS.map((question) => (
                 <Button
-                  key={item.question}
+                  key={question}
                   variant="outline"
                   size="sm"
+                  disabled={isLoading}
                   className="h-auto shrink-0 py-1.5 px-2.5 text-xs font-normal whitespace-nowrap"
-                  onClick={() => handleQuickQuestion(item)}
+                  onClick={() => handleQuickQuestion(question)}
                 >
-                  {item.question}
+                  {question}
                 </Button>
               ))}
             </div>
@@ -203,6 +194,7 @@ export function FloatingAiChat() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Type your message..."
+                disabled={isLoading}
                 className="min-w-0 flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-l-md rounded-r-none"
               />
               <Button
@@ -210,8 +202,9 @@ export function FloatingAiChat() {
                 size="icon"
                 className="size-9 shrink-0 rounded-l-none"
                 onClick={handleSend}
+                disabled={isLoading}
               >
-                <Send className="size-4" />
+                {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               </Button>
             </div>
           </div>
