@@ -1,17 +1,11 @@
 import { useState, useRef, useEffect } from "react"
-import { MessageSquare, X, Maximize2, Send, Bot, Sparkles, User, Loader2 } from "lucide-react"
+import { MessageSquare, X, Maximize2, Send, Bot, Sparkles, User, Loader2, BrainCircuit } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { analyzeBacktest } from "@/lib/ai-api"
-
-interface Message {
-  id: string
-  text: string
-  sender: "user" | "ai"
-  timestamp: Date
-}
+import { analyzeBacktest, buildBacktestContext } from "@/lib/ai-api"
+import { useChatContext } from "@/providers/ChatProvider"
 
 const QUICK_QUESTIONS = [
   "What is DCA?",
@@ -24,14 +18,10 @@ export function FloatingAiChat() {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello! I'm your AI Advisor. How can I help you with your trading strategy today?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ])
+
+  // ENH-3: messages come from context, not local state
+  const { floatingMessages: messages, addFloatingMessage, latestBacktest } = useChatContext()
+
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -41,19 +31,21 @@ export function FloatingAiChat() {
     }
   }, [messages, isOpen])
 
-  const addMessage = (text: string, sender: "user" | "ai") => {
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now().toString(), text, sender, timestamp: new Date() },
-    ])
-  }
-
   const sendMessage = async (userText: string) => {
-    addMessage(userText, "user")
+    addFloatingMessage(userText, "user")
     setIsLoading(true)
     try {
-      const result = await analyzeBacktest({ userQuery: userText })
-      addMessage(result.advice, "ai")
+      // ENH-2: attach the latest backtest result if one is available
+      const backtestContext = latestBacktest
+        ? buildBacktestContext(
+            latestBacktest.summary,
+            latestBacktest.trades,
+            { mode: latestBacktest.mode },
+          )
+        : undefined
+
+      const result = await analyzeBacktest({ userQuery: userText, backtestContext })
+      addFloatingMessage(result.advice, "ai")
     } catch (err) {
       console.error("[FloatingAiChat] analyzeBacktest failed:", err)
       const status = (err as { status?: number }).status
@@ -65,7 +57,7 @@ export function FloatingAiChat() {
             : status === 503
               ? "AI service is not configured (missing API key)."
               : "Sorry, I couldn't reach the AI advisor right now. Please try again."
-      addMessage(msg, "ai")
+      addFloatingMessage(msg, "ai")
     } finally {
       setIsLoading(false)
     }
@@ -129,6 +121,16 @@ export function FloatingAiChat() {
               </Button>
             </div>
           </div>
+
+          {/* ENH-2: backtest context banner — shown when a result is available */}
+          {latestBacktest && (
+            <div className="px-3 py-2 bg-primary/5 border-b border-primary/10 flex items-center gap-2 text-xs text-muted-foreground">
+              <BrainCircuit className="size-3.5 text-primary shrink-0" />
+              <span className="truncate">
+                Context: {latestBacktest.label}
+              </span>
+            </div>
+          )}
 
           {/* Message area */}
           <div
