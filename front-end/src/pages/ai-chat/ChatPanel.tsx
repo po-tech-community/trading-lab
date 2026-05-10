@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { McpExecutionPanel } from "@/components/mcp/McpExecutionPanel";
 import { MarketSnapshotCard, RiskCheckCard, AllocationDiagnosticsCard } from "@/components/mcp/ResultCards";
+import { MarkdownContent } from "@/components/ai/MarkdownContent";
 import type { ChatMessage } from "@/hooks/use-mcp-chat";
 
 interface ChatPanelProps {
@@ -24,6 +25,9 @@ interface ChatPanelProps {
  * - Small header with avatar and status.
  * - Scrollable message list.
  * - Single-line text input with send button.
+ *
+ * Per AI-FE-5 the AI message body uses the shared `MarkdownContent` renderer
+ * (bold, italic, headings, lists, inline code) instead of plain text.
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
   (
@@ -93,7 +97,13 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                       : "bg-primary text-primary-foreground",
                   )}
                 >
-                  {msg.text}
+                  {msg.sender === "ai" ? (
+                    // AI-FE-5: render assistant replies as markdown.
+                    <MarkdownContent text={msg.text} />
+                  ) : (
+                    // User messages stay as plain text (preserves whitespace).
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  )}
                 </div>
 
                 {msg.mcpExecution && (
