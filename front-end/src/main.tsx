@@ -11,9 +11,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryProvider>
       <ChatProvider>
         <App />
-
       </ChatProvider>
-      
     </QueryProvider>
   </StrictMode>
 );
