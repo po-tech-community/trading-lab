@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { McpExecutionPanel } from "@/components/mcp/McpExecutionPanel";
 import { MarketSnapshotCard, RiskCheckCard, AllocationDiagnosticsCard } from "@/components/mcp/ResultCards";
-import { MarkdownContent } from "@/components/ai/MarkdownContent";
-import type { ChatMessage } from "@/hooks/use-mcp-chat";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import type { ChatMessage } from "@/hooks/use-mcp-chat";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -98,20 +97,12 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                       : "bg-primary text-primary-foreground",
                   )}
                 >
-<<<<<<< HEAD
                   {msg.sender === "ai" ? (
                     // AI-FE-5: render assistant replies as markdown.
                     <MarkdownContent text={msg.text} />
                   ) : (
                     // User messages stay as plain text (preserves whitespace).
                     <p className="whitespace-pre-wrap">{msg.text}</p>
-=======
-                  {/* AI-FE-5: render AI messages as markdown, user messages as plain text */}
-                  {msg.sender === "ai" ? (
-                    <MarkdownContent text={msg.text} />
-                  ) : (
-                    msg.text
->>>>>>> 8885c28 (fix: AI-FE-5 — markdown rendering across all AI chat surfaces)
                   )}
                 </div>
 
