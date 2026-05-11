@@ -44,6 +44,10 @@ import {
 } from "@/lib/ai-api";
 import { useChatContext, type PanelMessage as Message } from "@/providers/ChatProvider";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8885c28 (fix: AI-FE-5 — markdown rendering across all AI chat surfaces)
 // ── Formatters ────────────────────────────────────────────────────────────────
  
 const currency = new Intl.NumberFormat("en-US", {
@@ -57,6 +61,7 @@ const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 function buildSummaryText(summary: BacktestSummary): string {
   return `Invested ${currency.format(summary.totalInvested)} → ${currency.format(summary.currentValue)} (${pct(summary.totalReturnPercentage)} ROI) over ${summary.numberOfPurchases} purchases.`;
 }
+
 
 export interface ChatProps {
   summary: BacktestSummary | null;
@@ -91,6 +96,7 @@ export function AiAdvisorPanel({
   config,
   onSuggestedAction,
 }: AiAdvisorPanelProps) {
+  // ENH-3: messages live in context so they survive route changes and layout re-mounts
   const { panelMessages: messages, setPanelMessages: setMessages } = useChatContext();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
