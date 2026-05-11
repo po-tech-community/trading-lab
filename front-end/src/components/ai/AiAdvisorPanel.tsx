@@ -44,10 +44,7 @@ import {
 } from "@/lib/ai-api";
 import { useChatContext, type PanelMessage as Message } from "@/providers/ChatProvider";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-<<<<<<< HEAD
-=======
 
->>>>>>> 8885c28 (fix: AI-FE-5 — markdown rendering across all AI chat surfaces)
 // ── Formatters ────────────────────────────────────────────────────────────────
  
 const currency = new Intl.NumberFormat("en-US", {
