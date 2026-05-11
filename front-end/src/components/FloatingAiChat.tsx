@@ -1,3 +1,16 @@
+/**
+ * FloatingAiChat  —  ENH-2 + ENH-3
+ *
+ * ENH-2  When the user sends a message the most-recently-completed backtest
+ *        result (stored in ChatContext.latestBacktest) is forwarded to the AI
+ *        via the `backtestContext` field of AnalyzeAiDto so the AI can give
+ *        context-aware advice from the floating widget.
+ *
+ * ENH-3  Message history is stored in ChatContext (not local state) so the
+ *        conversation persists across route changes, panel collapses, and
+ *        layout re-mounts.
+ */
+
 import { useState, useRef, useEffect } from "react"
 import { MessageSquare, X, Maximize2, Send, Bot, Sparkles, User, Loader2, BrainCircuit } from "lucide-react"
 import { useNavigate } from "react-router-dom"
@@ -6,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { analyzeBacktest, buildBacktestContext } from "@/lib/ai-api"
 import { useChatContext } from "@/providers/ChatProvider"
+import { MarkdownContent } from "@/components/ui/MarkdownContent"
 
 const QUICK_QUESTIONS = [
   "What is DCA?",
@@ -163,7 +177,11 @@ export function FloatingAiChat() {
                       : "bg-primary text-primary-foreground rounded-tr-none"
                   )}
                 >
-                  {msg.text}
+                  {msg.sender === "ai" ? (
+                    <MarkdownContent text={msg.text} />
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               </div>
             ))}
