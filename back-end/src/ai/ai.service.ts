@@ -10,6 +10,7 @@ import {
 import { PromptGeneratorService } from './prompt-generator.service';
 import { LlmService } from './llm.service';
 import { McpRuntimeService } from './mcp/mcp-runtime.service';
+import type { Response } from 'express';
 
 @Injectable()
 export class AiService {
@@ -19,7 +20,7 @@ export class AiService {
     private readonly promptGeneratorService: PromptGeneratorService,
     private readonly llmService: LlmService,
     private readonly mcpRuntimeService: McpRuntimeService,
-  ) {}
+  ) { }
 
   async analyze(
     input: AnalyzeAiDto,
@@ -45,6 +46,43 @@ export class AiService {
       mcp: mcpBundle.trace,
       evidence: mcpBundle.evidence,
     };
+  }
+
+  /**
+   * Streaming variant of analyze — collects MCP evidence synchronously,
+   * then streams the LLM token-by-token via SSE into the raw Express response.
+   *
+   * The controller must set SSE headers and pass the raw @Res() before calling this.
+   */
+  async analyzeStream(
+    input: AnalyzeAiDto,
+    actor: { userId: string; email?: string },
+    res: Response,
+  ): Promise<void> {
+    this.logger.log(`[analyzeStream] userId=${actor.userId} query="${input.userQuery.slice(0, 80)}"`);
+
+    // 1. Collect MCP evidence (non-streaming, same as before)
+    const mcpBundle = await this.mcpRuntimeService.collectEvidence(
+      actor,
+      input.userQuery,
+      input,
+    );
+    this.logger.log(`[analyzeStream] MCP status=${mcpBundle.trace.status} evidence=${mcpBundle.evidence.length}`);
+
+    // 2. Emit the metadata event so the client can render cards / suggested actions
+    //    before the text starts arriving.
+    const meta = {
+      suggestedActions: this.buildSuggestedActions(input),
+      evidence: mcpBundle.evidence,
+      mcp: mcpBundle.trace,
+    };
+    res.write(`data: ${JSON.stringify({ meta })}\n\n`);
+
+    // 3. Stream LLM tokens
+    const prompt = this.promptGeneratorService.generate(input, mcpBundle.evidence);
+    this.logger.log('[analyzeStream] Streaming LLM tokens...');
+    await this.llmService.generateAdviceStream(prompt, res);
+    // generateAdviceStream handles res.end() internally
   }
 
   async inspect(

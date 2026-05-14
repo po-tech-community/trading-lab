@@ -188,7 +188,12 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                 >
                   {msg.sender === "ai" ? (
                     // AI-FE-5: render assistant replies as markdown.
-                    <MarkdownContent text={msg.text} />
+                    // Show a blinking cursor while the message is still streaming in (empty text).
+                    msg.text === "" ? (
+                      <span className="inline-block w-2 h-4 bg-primary/70 animate-pulse rounded-sm" />
+                    ) : (
+                      <MarkdownContent text={msg.text} />
+                    )
                   ) : (
                     // User messages stay as plain text (preserves whitespace).
                     <p className="whitespace-pre-wrap">{msg.text}</p>
