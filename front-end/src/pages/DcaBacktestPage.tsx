@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,7 @@ function formatApiError(error: unknown): string {
  * DCA Backtest page: simulate recurring investments over historical data.
  */
 export default function DcaBacktestPage() {
+  const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [backtestResult, setBacktestResult] =
@@ -52,6 +54,15 @@ export default function DcaBacktestPage() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const strategyCardRef = useRef<StrategyConfigCardHandle>(null);
   
+  useEffect(() => {
+    if (!location.hash) return;
+    const frame = window.requestAnimationFrame(() => {
+      setIsSidebarCollapsed(false);
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash]);
+
 
   const assetLabelMap: Record<typeof selectedSymbol, string> = {
     BTC: "Bitcoin",
