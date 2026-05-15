@@ -13,6 +13,7 @@ import type { ChatMessage } from "@/hooks/use-mcp-chat";
 interface ChatPanelProps {
   messages: ChatMessage[];
   input: string;
+  inputRef?: ForwardedRef<HTMLInputElement>;
   onInputChange: (value: string) => void;
   onSend: () => void;
   onMcpApprove?: (id: string) => void;
@@ -31,7 +32,7 @@ interface ChatPanelProps {
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
   (
-    { messages, input, onInputChange, onSend, onMcpApprove, onMcpDeny, isSending = false },
+    { messages, input, inputRef, onInputChange, onSend, onMcpApprove, onMcpDeny, isSending = false },
     scrollRef: ForwardedRef<HTMLDivElement>,
   ) => {
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -149,6 +150,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
         <div className="p-6 bg-card border-t relative">
           <div className="relative max-w-3xl mx-auto flex items-center gap-0 rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
             <Input
+              ref={inputRef}
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}

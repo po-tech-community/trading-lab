@@ -2,20 +2,56 @@ import { Search } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+interface AiChatSidebarProps {
+  sessions: Array<{ id: string; label: string }>;
+  selectedSessionId: string;
+  onSessionChange: (id: string) => void;
+  onNewInvestigation: () => void;
+}
 
 /**
- * Static sidebar with mock conversation history and a search input.
- * Replace contents with real sessions/history when backend is wired up.
+ * Sidebar for AI Studio. Offers a backtest selector and a new investigation reset.
  */
-export function AiChatSidebar() {
+export function AiChatSidebar({
+  sessions,
+  selectedSessionId,
+  onSessionChange,
+  onNewInvestigation,
+}: AiChatSidebarProps) {
   return (
     <Card className="hidden lg:flex flex-col w-80 overflow-hidden py-0">
-      <div className="p-6 border-b border-border">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input className="pl-10 h-9" placeholder="Search conversations..." />
+      <div className="p-6 border-b border-border space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Load backtest
+          </p>
+          <p className="text-sm text-foreground/80">
+            Attach the latest DCA or portfolio result to AI requests.
+          </p>
         </div>
+
+        <Select value={selectedSessionId} onValueChange={onSessionChange}>
+          <SelectTrigger className="h-10 w-full rounded-md border border-input bg-background text-sm">
+            <SelectValue placeholder="Select backtest session" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-primary/10">
+            {sessions.map((session) => (
+              <SelectItem key={session.id} value={session.id}>
+                {session.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
+
       <CardContent className="flex-1 space-y-2 overflow-y-auto">
         <div className="p-3 rounded-md bg-muted cursor-pointer">
           <p className="text-xs text-primary mb-1">Current session</p>
@@ -34,7 +70,9 @@ export function AiChatSidebar() {
         ))}
       </CardContent>
       <div className="p-6 mt-auto border-t border-border">
-        <Button className="w-full">New investigation</Button>
+        <Button className="w-full" onClick={onNewInvestigation}>
+          New investigation
+        </Button>
       </div>
     </Card>
   )
