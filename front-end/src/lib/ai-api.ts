@@ -15,6 +15,7 @@ interface BacktestContextSnapshot {
         realizedProfit?: number;
         unrealizedValue?: number;
     };
+    assets?: Array<{ symbol: string; weight: number }>;
     trades?: Array<{
         date: string;
         type: string;
@@ -35,6 +36,7 @@ export interface AiAnalyzeResponse {
     advice: string;
     /** Plain-text labels returned by backend, e.g. "Compare weekly vs monthly" */
     suggestedActions?: string[];
+    evidence?: McpEvidence[];
 }
 
 /**
@@ -139,9 +141,7 @@ export interface McpEvidence {
     error?: string;
 }
 
-export interface AiAnalyzeFullResponse extends AiAnalyzeResponse {
-    evidence?: McpEvidence[];
-}
+export type AiAnalyzeFullResponse = AiAnalyzeResponse;
 
 export interface McpExecuteRequest {
     userQuery: string;
