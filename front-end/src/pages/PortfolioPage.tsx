@@ -12,8 +12,9 @@
  *  - Retains mock summary cards as placeholders until L2-FE-3 is done
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader";
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
@@ -46,6 +47,7 @@ const ASSET_LABELS: Record<string, string> = {
 };
 
 export default function PortfolioPage() {
+  const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
@@ -89,6 +91,15 @@ export default function PortfolioPage() {
   }
 
   const chartData = result ? timelineToChartData(result.timeline) : [];
+
+  useEffect(() => {
+    if (!location.hash) return;
+    const frame = window.requestAnimationFrame(() => {
+      setIsCollapsed(false);
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash]);
 
   const assetSeriesOptions = useMemo(() => {
     if (!result) return [];
@@ -166,7 +177,7 @@ export default function PortfolioPage() {
             }
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div id="allocation-overview" className="grid gap-4 md:grid-cols-2 scroll-mt-6">
             <CompositionPieChart
               assets={
                 result
