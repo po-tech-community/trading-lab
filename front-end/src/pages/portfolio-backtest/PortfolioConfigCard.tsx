@@ -120,7 +120,7 @@ export const PortfolioConfigCard = forwardRef<
   });
 
   useImperativeHandle(ref, () => ({
-    applyField: (field, value) => form.setValue(field, value, { shouldValidate: true }),
+    applyField: (field, value) => form.setValue(field, value as never, { shouldValidate: true }),
   }));
 
   // Derive whether weight sum is currently valid (live, from watched values)

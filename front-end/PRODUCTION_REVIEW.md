@@ -1,15 +1,22 @@
 # TradingLab Front-End — Production Readiness Review
 
 **Date:** 2026-05-17  
-**Last updated:** 2026-05-17 (session 2)  
+**Last updated:** 2026-05-17 (session 3)  
 **Branch:** `develop`  
 **Stack:** React 19, TypeScript 5.9, Vite 7, TanStack Query v5, Tailwind CSS v4, shadcn/ui
 
 ---
 
-## Session 2 — Changes Applied
+## Session 3 — Changes Applied
 
-The following issues were resolved after the initial review:
+| Area | Change |
+|------|--------|
+| ✅ B1 resolved | `CreateModelPage.tsx` — React Hook Form generic mismatch fixed; `useForm` now has explicit 3-generic signature + resolver cast resolves `z.coerce` input/output split |
+| ✅ `PortfolioConfigCard` setValue | `form.setValue(field, value as never, ...)` — RHF `PathValue` conditional type satisfied |
+
+**Build is now clean.** `tsc --noEmit` exits 0 with zero errors.
+
+## Session 2 — Changes Applied
 
 | Area | Change |
 |------|--------|
@@ -33,22 +40,22 @@ The codebase has solid architectural foundations — clean component hierarchy, 
 
 | Status | Count |
 |--------|-------|
-| 🔴 Critical blockers | 2 |
+| 🔴 Critical blockers | 1 |
 | 🟠 High priority | 5 |
 | 🟡 Medium priority | 9 |
 | 🟢 Low / polish | 7 |
 
-**The build is partially broken.** `CreateModelPage.tsx` still has TypeScript errors that prevent `vite build` from completing. The `PortfolioPage.tsx` errors from the initial review are resolved.
+**The build is green.** `tsc --noEmit` passes with zero errors. The only remaining critical blocker is zero test coverage.
 
 ---
 
 ## Quick Reference — Critical Blockers
 
-| # | Issue | File | Line | Status |
-|---|-------|------|------|--------|
-| B1 | React Hook Form generic type mismatch — **build fails** | `src/pages/ai-advisor/CreateModelPage.tsx` | 233, 247, 276, 297, 320 | 🔴 Open |
-| ~~B2~~ | ~~Unused imports break strict TypeScript build~~ | ~~`src/pages/PortfolioPage.tsx`~~ | ~~19, 20, 55~~ | ✅ Fixed |
-| B3 | Zero test coverage — no framework installed | — | — | 🔴 Open |
+| # | Issue | File | Status |
+|---|-------|------|--------|
+| ~~B1~~ | ~~React Hook Form generic type mismatch — build fails~~ | ~~`CreateModelPage.tsx`~~ | ✅ Fixed |
+| ~~B2~~ | ~~Unused imports break strict TypeScript build~~ | ~~`PortfolioPage.tsx`~~ | ✅ Fixed |
+| B3 | Zero test coverage — no framework installed | — | 🔴 Open |
 
 ---
 
@@ -87,28 +94,15 @@ src/
 
 ## 2. TypeScript & Type Safety
 
-**Rating: 🔴 Critical**
+**Rating: 🟠 Fair — build passes, pervasive `any` remains**
 
-### Build-Breaking Errors
+### Build-Breaking Errors ✅ All resolved
 
-**`src/pages/ai-advisor/CreateModelPage.tsx` (lines 233, 247, 276, 297, 320)** 🔴 Still open
+- **`CreateModelPage.tsx`** ✅ Fixed — `useForm<ModelFormValues, unknown, ModelFormValues>` with an explicit resolver cast resolves the `z.coerce` input/output type split that caused 10 TS2322 errors.
+- **`PortfolioConfigCard.tsx`** ✅ Fixed — `form.setValue(field, value as never, ...)` satisfies RHF's `PathValue` conditional type.
+- **`PortfolioPage.tsx`** ✅ Fixed — fullscreen feature added, all previously unused imports now used.
 
-`useForm()` `Control` generic does not match the `FormField` component's expected type. All five `<FormField control={form.control}` usages fail with `TS2322`.
-
-Fix: Ensure the form generic matches the Zod schema inferred type:
-```ts
-// Before
-const form = useForm<FormValues>({ ... })
-
-// After — explicitly pass the resolver type
-const form = useForm<z.infer<typeof formSchema>>({
-  resolver: zodResolver(formSchema),
-})
-```
-
-**`src/pages/PortfolioPage.tsx`** ✅ Resolved — `Button`, `cn`, `isFullscreen` now used by the added fullscreen feature.
-
-### Pervasive `any` Usage (28 ESLint errors)
+### Pervasive `any` Usage (open — ~28 ESLint errors)
 
 | File | Lines | Notes |
 |------|-------|-------|
@@ -116,15 +110,13 @@ const form = useForm<z.infer<typeof formSchema>>({
 | `src/components/mcp/McpExecutionPanel.tsx` | 12, 15, 81 | Input and result types |
 | `src/pages/dca-backtest/timeline-to-chart.ts` | 10–13 | Chart data transformation |
 | `src/pages/SettingsPage.tsx` | 51, 89 | Form handlers |
-| `src/pages/portfolio-backtest/PortfolioConfigCard.tsx` | 91 | Config shape |
+| `src/pages/portfolio-backtest/PortfolioConfigCard.tsx` | 91, 102 | Config shape, resolver cast |
 | `src/hooks/use-auth.ts` | 129 | `as any` cast |
 | `src/examples/components/UITestPage.tsx` | 580 | Example only |
 
 **Actions:**
-1. Fix `CreateModelPage` types — unblocks the build 🔴 Still open
-2. ~~Fix `PortfolioPage` unused imports~~ ✅ Fixed
-3. Replace `any` in `api-client.ts` with proper generics (`Record<string, unknown>` or typed response interfaces)
-4. Type chart transformation inputs in `timeline-to-chart.ts`
+1. Replace `any` in `api-client.ts` with proper generics (`Record<string, unknown>` or typed response interfaces)
+2. Type chart transformation inputs in `timeline-to-chart.ts`
 
 ---
 
@@ -384,16 +376,13 @@ Only one env var used (`VITE_API_URL`), hardcoded in two files as a fallback, an
 
 ## 14. Build Configuration
 
-**Rating: 🟠 Partially broken**
+**Rating: ✅ Green**
 
 `tsconfig.json` is correctly strict (`strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`). Path aliases aligned between tsconfig and vite.config.
 
-**Build currently fails** due to:
-1. `TS2322` type error in `CreateModelPage.tsx` (5 occurrences) — 🔴 Still open
-2. ~~Unused `Button`, `cn` imports in `PortfolioPage.tsx`~~ — ✅ Fixed
+**Build is clean** — `tsc --noEmit` exits 0, all previous TS2322 errors resolved.
 
 **Actions:**
-- Fix type errors above to restore a green build
 - Add `vite-plugin-visualizer` to track bundle size over time
 - Enable source maps for production error tracing:
   ```ts
@@ -438,8 +427,6 @@ React Router v6 with nested layouts, protected routes, and 404/403 fallbacks. Ro
 | File | Issue | Status |
 |------|-------|--------|
 | `/old_button.tsx` | Entire file unused | Open |
-| ~~`src/pages/PortfolioPage.tsx:19-20`~~ | ~~`Button`, `cn` imported but never used~~ | ✅ Fixed — used by fullscreen feature |
-| ~~`src/pages/PortfolioPage.tsx:55`~~ | ~~`isFullscreen`, `setIsFullscreen` state never used~~ | ✅ Fixed — fullscreen now implemented |
 | `src/pages/dca-backtest/TradeHistoryTable.tsx:62` | `_portfolioSymbols` declared but not used | Open |
 | `src/assets/react.svg` | Not imported anywhere | Open |
 
@@ -499,22 +486,20 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 ### Phase 1 — Unblock Production (Week 1)
 
-- [ ] Fix `CreateModelPage.tsx` React Hook Form type errors → **build passes** 🔴
+- [x] ~~Fix `CreateModelPage.tsx` React Hook Form type errors~~ ✅ (session 3)
 - [x] ~~Fix unused imports in `PortfolioPage.tsx`~~ ✅
+- [x] ~~Backtest history persistence~~ ✅
+- [x] ~~Portfolio AI wiring~~ ✅
+- [x] ~~Portfolio fullscreen button~~ ✅
+- [x] ~~`TodosModule` scaffold removed~~ ✅
+- [x] ~~`FloatingAiChat` removed from `MainLayout`~~ ✅
+- [x] ~~Duplicate AI welcome message~~ ✅
+- [x] ~~`parseActionLabel` rewritten~~ ✅
+- [x] ~~`TooltipProvider` wrapper added to `PortfolioPage`~~ ✅
 - [ ] Fix `Math.random()` in `sidebar.tsx:609`
 - [ ] Add Error Boundary to `MainLayout`
 - [ ] Add environment variable validation on startup
 - [ ] Delete `/old_button.tsx` and `src/assets/react.svg`
-
-**Also completed this session (not in original plan):**
-- [x] Backtest history persistence — MongoDB schema + API endpoints + frontend save/load ✅
-- [x] Portfolio AI wiring — `onSuggestedAction` connected via `forwardRef` ✅
-- [x] Portfolio fullscreen button — parity with DCA Backtest page ✅
-- [x] `TodosModule` scaffold removed from backend ✅
-- [x] `FloatingAiChat` removed from `MainLayout` ✅
-- [x] Duplicate AI welcome message fixed ✅
-- [x] `parseActionLabel` rewritten — comparison/relative chips now route to chat instead of silently mutating the form ✅
-- [x] `TooltipProvider` wrapper added to `PortfolioPage` ✅
 
 ### Phase 2 — Quality (Week 2)
 
@@ -539,24 +524,24 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 ## Score Summary
 
-| Category | Score (v1) | Score (v2) | Priority |
-|----------|-----------|-----------|----------|
-| Project Structure | ✅ 9/10 | ✅ 9/10 | — |
-| TypeScript Safety | 🔴 4/10 | 🟠 5/10 | Critical |
-| Component Architecture | ✅ 8/10 | ✅ 9/10 | Low |
-| State Management | 🟡 7/10 | ✅ 8/10 | Medium |
-| API / Data Fetching | 🟡 7/10 | 🟡 7/10 | Medium |
-| Error Handling | 🟡 6/10 | 🟡 6/10 | High |
-| Performance | 🟡 5/10 | 🟡 5/10 | Medium |
-| Accessibility | ✅ 8/10 | ✅ 8/10 | Low |
-| Security | ✅ 8/10 | ✅ 8/10 | Low |
-| Testing | 🔴 0/10 | 🔴 0/10 | Critical |
-| Code Style | 🟡 6/10 | 🟡 6/10 | Medium |
-| Dependencies | ✅ 9/10 | ✅ 9/10 | — |
-| Environment Config | 🟡 5/10 | 🟡 5/10 | Medium |
-| Build Config | 🔴 0/10 | 🟠 3/10 | Critical |
-| CSS / Styling | ✅ 9/10 | ✅ 9/10 | — |
-| Routing | ✅ 8/10 | ✅ 8/10 | Low |
-| **Overall** | **6.3 / 10** | **6.6 / 10** | — |
+| Category | Score (v1) | Score (v2) | Score (v3) | Priority |
+|----------|-----------|-----------|-----------|----------|
+| Project Structure | ✅ 9/10 | ✅ 9/10 | ✅ 9/10 | — |
+| TypeScript Safety | 🔴 4/10 | 🟠 5/10 | 🟡 7/10 | Medium |
+| Component Architecture | ✅ 8/10 | ✅ 9/10 | ✅ 9/10 | Low |
+| State Management | 🟡 7/10 | ✅ 8/10 | ✅ 8/10 | Medium |
+| API / Data Fetching | 🟡 7/10 | 🟡 7/10 | 🟡 7/10 | Medium |
+| Error Handling | 🟡 6/10 | 🟡 6/10 | 🟡 6/10 | High |
+| Performance | 🟡 5/10 | 🟡 5/10 | 🟡 5/10 | Medium |
+| Accessibility | ✅ 8/10 | ✅ 8/10 | ✅ 8/10 | Low |
+| Security | ✅ 8/10 | ✅ 8/10 | ✅ 8/10 | Low |
+| Testing | 🔴 0/10 | 🔴 0/10 | 🔴 0/10 | Critical |
+| Code Style | 🟡 6/10 | 🟡 6/10 | 🟡 6/10 | Medium |
+| Dependencies | ✅ 9/10 | ✅ 9/10 | ✅ 9/10 | — |
+| Environment Config | 🟡 5/10 | 🟡 5/10 | 🟡 5/10 | Medium |
+| Build Config | 🔴 0/10 | 🟠 3/10 | ✅ 9/10 | — |
+| CSS / Styling | ✅ 9/10 | ✅ 9/10 | ✅ 9/10 | — |
+| Routing | ✅ 8/10 | ✅ 8/10 | ✅ 8/10 | Low |
+| **Overall** | **6.3 / 10** | **6.6 / 10** | **7.1 / 10** | — |
 
-> Score improvements: TypeScript Safety (+1 — B2 resolved), Component Architecture (+1 — portfolio AI wiring + fullscreen parity), State Management (+1 — duplicate message bug + parseActionLabel fixed + persistence added), Build Config (+3 — one of two build errors resolved).
+> v3 improvements: TypeScript Safety (+2 — B1 fixed, build clean), Build Config (+6 — zero TS errors, `tsc --noEmit` exits 0).
