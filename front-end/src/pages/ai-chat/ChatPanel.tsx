@@ -1,12 +1,19 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback } from "react";
 import type { ForwardedRef, KeyboardEvent } from "react";
 import { Bot, User, Send, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { McpExecutionPanel } from "@/components/mcp/McpExecutionPanel";
-import { MarketSnapshotCard, RiskCheckCard, AllocationDiagnosticsCard } from "@/components/mcp/ResultCards";
+import {
+  MarketSnapshotCard,
+  RiskCheckCard,
+  AllocationDiagnosticsCard,
+  type AllocationDiagnosticsData,
+} from "@/components/mcp/ResultCards";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import type { ChatMessage } from "@/hooks/use-mcp-chat";
 
@@ -20,26 +27,108 @@ interface ChatPanelProps {
   isSending?: boolean;
 }
 
+// AI-FE-6: localStorage key shared with the (mock) Market Data watchlist surface.
+const WATCHLIST_STORAGE_KEY = "tradingLab.watchlist";
+
+function readWatchlist(): string[] {
+  try {
+    const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWatchlist(symbols: string[]) {
+  try {
+    localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(symbols));
+  } catch {
+    // localStorage may be unavailable (private mode); the toast still gives feedback.
+  }
+}
+
+function summariseTrades(data: AllocationDiagnosticsData): string {
+  const buys = data.suggestedTrades.filter((t) => t.action === "buy").length;
+  const sells = data.suggestedTrades.filter((t) => t.action === "sell").length;
+  const parts: string[] = [];
+  if (buys) parts.push(`${buys} buy${buys === 1 ? "" : "s"}`);
+  if (sells) parts.push(`${sells} sell${sells === 1 ? "" : "s"}`);
+  return parts.length ? parts.join(" / ") : "no trades";
+}
+
 /**
  * Right-hand chat panel for the AI Advisor:
  * - Small header with avatar and status.
  * - Scrollable message list.
  * - Single-line text input with send button.
  *
- * Per AI-FE-5 the AI message body uses the shared `MarkdownContent` renderer
- * (bold, italic, headings, lists, inline code) instead of plain text.
+ * Per AI-FE-5 the AI message body now uses the shared `MarkdownContent`
+ * renderer (bold, italic, headings, lists, inline code) instead of plain text.
+ *
+ * Per AI-FE-6 the six result-card action buttons are wired to real navigation
+ * and toast feedback (previously `console.log` stubs).
  */
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
   (
     { messages, input, onInputChange, onSend, onMcpApprove, onMcpDeny, isSending = false },
     scrollRef: ForwardedRef<HTMLDivElement>,
   ) => {
+    const navigate = useNavigate();
+
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
         e.preventDefault();
         onSend();
       }
     };
+
+    // ── AI-FE-6: ResultCard action handlers ─────────────────────────────────
+    // Pattern: every action shows a `toast` so the user gets immediate feedback,
+    // then (where appropriate) navigates to the page that owns the underlying
+    // data so they can drill down or apply the suggestion.
+
+    const handleViewMarketDetails = useCallback(
+      (symbol: string) => {
+        toast.info(`Opening market data for ${symbol}…`);
+        navigate("/home/market");
+      },
+      [navigate],
+    );
+
+    const handleAddToWatchlist = useCallback((symbol: string) => {
+      const current = readWatchlist();
+      if (current.includes(symbol)) {
+        toast(`${symbol} is already in your watchlist.`);
+        return;
+      }
+      writeWatchlist([...current, symbol]);
+      toast.success(`Added ${symbol} to your watchlist.`);
+    }, []);
+
+    const handleViewRiskReport = useCallback(() => {
+      toast.info("Opening the latest backtest results to inspect risk metrics.");
+      navigate("/home/backtest");
+    }, [navigate]);
+
+    const handleAdjustStrategy = useCallback(() => {
+      toast.info("Adjust your DCA frequency, amount, or TP/SL triggers below.");
+      navigate("/home/backtest");
+    }, [navigate]);
+
+    const handleRebalance = useCallback(
+      (data: AllocationDiagnosticsData) => {
+        toast.success(`Opening portfolio config — ${summariseTrades(data)} suggested.`);
+        navigate("/home/portfolio");
+      },
+      [navigate],
+    );
+
+    const handleViewAllocation = useCallback(() => {
+      toast.info("Opening your portfolio allocation chart.");
+      navigate("/home/portfolio");
+    }, [navigate]);
 
     return (
       <Card className="flex-1 flex flex-col overflow-hidden relative gap-0 py-0">
@@ -99,7 +188,12 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                 >
                   {msg.sender === "ai" ? (
                     // AI-FE-5: render assistant replies as markdown.
-                    <MarkdownContent text={msg.text} />
+                    // Show a blinking cursor while the message is still streaming in (empty text).
+                    msg.text === "" ? (
+                      <span className="inline-block w-2 h-4 bg-primary/70 animate-pulse rounded-sm" />
+                    ) : (
+                      <MarkdownContent text={msg.text} />
+                    )
                   ) : (
                     // User messages stay as plain text (preserves whitespace).
                     <p className="whitespace-pre-wrap">{msg.text}</p>
@@ -120,22 +214,28 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                     {msg.resultCards.marketSnapshot && (
                       <MarketSnapshotCard
                         data={msg.resultCards.marketSnapshot}
-                        onViewDetails={() => console.log('View market details')}
-                        onAddToWatchlist={() => console.log('Add to watchlist')}
+                        onViewDetails={() =>
+                          handleViewMarketDetails(msg.resultCards!.marketSnapshot!.symbol)
+                        }
+                        onAddToWatchlist={() =>
+                          handleAddToWatchlist(msg.resultCards!.marketSnapshot!.symbol)
+                        }
                       />
                     )}
                     {msg.resultCards.riskCheck && (
                       <RiskCheckCard
                         data={msg.resultCards.riskCheck}
-                        onViewReport={() => console.log('View risk report')}
-                        onAdjustStrategy={() => console.log('Adjust strategy')}
+                        onViewReport={handleViewRiskReport}
+                        onAdjustStrategy={handleAdjustStrategy}
                       />
                     )}
                     {msg.resultCards.allocationDiagnostics && (
                       <AllocationDiagnosticsCard
                         data={msg.resultCards.allocationDiagnostics}
-                        onRebalance={() => console.log('Rebalance portfolio')}
-                        onViewAllocation={() => console.log('View allocation')}
+                        onRebalance={() =>
+                          handleRebalance(msg.resultCards!.allocationDiagnostics!)
+                        }
+                        onViewAllocation={handleViewAllocation}
                       />
                     )}
                   </div>
