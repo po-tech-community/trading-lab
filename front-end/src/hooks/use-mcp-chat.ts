@@ -18,6 +18,10 @@ export interface ChatMessage {
 export interface UseMcpChatReturn {
   messages: ChatMessage[];
   addTextMessage: (text: string, sender: 'user' | 'ai') => void;
+  /** Adds an empty AI message and returns its id — use appendToMessage to fill it. */
+  startStreamingMessage: () => string;
+  /** Appends a token to an existing message by id. */
+  appendToMessage: (id: string, token: string) => void;
   addMcpExecution: (execution: Omit<McpExecution, 'id' | 'timestamp'>) => string;
   updateMcpExecution: (id: string, updates: Partial<McpExecution>) => void;
   approveMcpExecution: (id: string) => void;
@@ -41,6 +45,28 @@ export function useMcpChat(): UseMcpChatReturn {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, newMessage]);
+  }, []);
+
+  /** Creates an empty AI message placeholder and returns its id. */
+  const startStreamingMessage = useCallback((): string => {
+    const id = `stream-${Date.now()}`;
+    const newMessage: ChatMessage = {
+      id,
+      text: '',
+      sender: 'ai',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, newMessage]);
+    return id;
+  }, []);
+
+  /** Appends a token to an existing message in-place (no new message added). */
+  const appendToMessage = useCallback((id: string, token: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === id ? { ...msg, text: msg.text + token } : msg,
+      ),
+    );
   }, []);
 
   const addMcpExecution = useCallback((executionData: Omit<McpExecution, 'id' | 'timestamp'>) => {
@@ -112,6 +138,8 @@ export function useMcpChat(): UseMcpChatReturn {
   return {
     messages,
     addTextMessage,
+    startStreamingMessage,
+    appendToMessage,
     addMcpExecution,
     updateMcpExecution,
     approveMcpExecution,

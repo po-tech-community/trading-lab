@@ -18,6 +18,7 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader";
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
+import { useChatContext } from "@/providers/ChatProvider";
 import {
   Card,
   CardContent,
@@ -52,11 +53,30 @@ export default function PortfolioPage() {
   const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
+
+  const { setLatestBacktest } = useChatContext();
+
   const mutation = useMutation({
     mutationFn: runPortfolioBacktest,
     onSuccess: (data) => {
       setResult(data);
       toast.success("Portfolio backtest completed");
+      // ENH-2: make result available to FloatingAiChat globally
+      const symbols = data.summary.assets.map((a) => a.symbol).join(" / ");
+      setLatestBacktest({
+        summary: {
+          totalInvested: data.summary.totalInvested,
+          currentValue: data.summary.currentValue,
+          totalReturnPercentage: data.summary.totalReturnPercentage,
+          totalHoldings: data.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
+          numberOfPurchases: data.summary.numberOfPurchases,
+          realizedProfit: data.summary.realizedProfit,
+          unrealizedValue: data.summary.unrealizedValue,
+        },
+        trades: data.trades,
+        mode: "portfolio",
+        label: `${symbols} portfolio backtest`,
+      });
     },
     onError: (err) => {
       setSubmitError(

@@ -26,6 +26,7 @@ import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
 // L4-FE-1/2/3 — AI Advisor panel + trigger button
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
 import type { SuggestedAction } from "@/lib/ai-api";
+import { useChatContext } from "@/providers/ChatProvider";
 
 function formatApiError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -53,7 +54,6 @@ export default function DcaBacktestPage() {
   const [lastConfig, setLastConfig] = useState<RunBacktestRequestBody | undefined>(undefined);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const strategyCardRef = useRef<StrategyConfigCardHandle>(null);
-  
   useEffect(() => {
     if (!location.hash) return;
     const frame = window.requestAnimationFrame(() => {
@@ -63,6 +63,8 @@ export default function DcaBacktestPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [location.hash]);
 
+  // ENH-2: publish the completed result to global context so FloatingAiChat can use it
+  const { setLatestBacktest } = useChatContext();
 
   const assetLabelMap: Record<typeof selectedSymbol, string> = {
     BTC: "Bitcoin",
@@ -76,6 +78,12 @@ export default function DcaBacktestPage() {
     onSuccess: (data) => {
       setBacktestResult(data);
       toast.success("Backtest completed");
+      setLatestBacktest({
+        summary: data.summary,
+        trades: data.trades,
+        mode: "single",
+        label: `${assetLabelMap[selectedSymbol] ?? selectedSymbol} DCA backtest`,
+      });
     },
     onError: (err) => {
       toast.error(formatApiError(err));

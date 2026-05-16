@@ -15,6 +15,7 @@ interface BacktestContextSnapshot {
         realizedProfit?: number;
         unrealizedValue?: number;
     };
+    assets?: Array<{ symbol: string; weight: number }>;
     trades?: Array<{
         date: string;
         type: string;
@@ -35,6 +36,7 @@ export interface AiAnalyzeResponse {
     advice: string;
     /** Plain-text labels returned by backend, e.g. "Compare weekly vs monthly" */
     suggestedActions?: string[];
+    evidence?: McpEvidence[];
 }
 
 /**
@@ -139,9 +141,7 @@ export interface McpEvidence {
     error?: string;
 }
 
-export interface AiAnalyzeFullResponse extends AiAnalyzeResponse {
-    evidence?: McpEvidence[];
-}
+export type AiAnalyzeFullResponse = AiAnalyzeResponse;
 
 export interface McpExecuteRequest {
     userQuery: string;
@@ -158,6 +158,109 @@ export async function analyzeBacktest(
         method: "POST",
         body: JSON.stringify(body),
     });
+}
+
+/**
+ * Streams AI advice tokens from GET /ai/analyze/stream via Server-Sent Events.
+ *
+ * Calls `onMeta` once with suggestedActions/evidence/mcp before tokens arrive,
+ * then calls `onToken` for each incremental text chunk, and `onDone` when the
+ * stream closes normally. `onError` is called on any error event or network failure.
+ *
+ * Returns a cleanup function — call it to abort the stream early.
+ */
+export function analyzeBacktestStream(
+    body: AiAnalyzeRequest,
+    callbacks: {
+        onMeta?: (meta: {
+            suggestedActions?: string[];
+            evidence?: AiAnalyzeFullResponse["evidence"];
+            mcp?: Record<string, unknown>;
+        }) => void;
+        onToken: (token: string) => void;
+        onDone?: () => void;
+        onError?: (message: string) => void;
+    },
+): () => void {
+    const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+    const token = localStorage.getItem("accessToken");
+
+    const payload = encodeURIComponent(JSON.stringify(body));
+    const url = `${BASE_URL}/ai/analyze/stream?payload=${payload}`;
+
+    const controller = new AbortController();
+
+    // EventSource doesn't support Authorization headers — we use fetch+ReadableStream instead.
+    void (async () => {
+        try {
+            const res = await fetch(url, {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    Accept: "text/event-stream",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                signal: controller.signal,
+            });
+
+            if (!res.ok || !res.body) {
+                callbacks.onError?.(`Stream request failed: ${res.status} ${res.statusText}`);
+                return;
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // SSE lines are separated by \n\n
+                const parts = buffer.split("\n\n");
+                buffer = parts.pop() ?? ""; // keep incomplete last chunk
+
+                for (const part of parts) {
+                    const line = part.trim();
+                    if (!line.startsWith("data:")) continue;
+                    const raw = line.slice(5).trim();
+
+                    if (raw === "[DONE]") {
+                        callbacks.onDone?.();
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(raw) as {
+                            token?: string;
+                            meta?: Parameters<NonNullable<typeof callbacks.onMeta>>[0];
+                            error?: string;
+                        };
+
+                        if (parsed.error) {
+                            callbacks.onError?.(parsed.error);
+                            return;
+                        }
+                        if (parsed.meta) {
+                            callbacks.onMeta?.(parsed.meta);
+                        }
+                        if (parsed.token !== undefined) {
+                            callbacks.onToken(parsed.token);
+                        }
+                    } catch {
+                        // malformed SSE data line — skip
+                    }
+                }
+            }
+        } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") return;
+            callbacks.onError?.(err instanceof Error ? err.message : "Stream connection failed");
+        }
+    })();
+
+    return () => controller.abort();
 }
 
 export async function mcpInspect(

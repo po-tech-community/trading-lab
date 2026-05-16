@@ -7,7 +7,7 @@ import { AiChatSidebar } from "./ai-chat/Sidebar"
 import { ChatPanel } from "./ai-chat/ChatPanel"
 import { useMcpChat } from "@/hooks/use-mcp-chat"
 import {
-  analyzeBacktest,
+  analyzeBacktestStream,
   mcpInspect,
   mcpExecute,
   evidenceToCards,
@@ -48,10 +48,14 @@ export default function AiChatPage() {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingRef = useRef<PendingSession | null>(null)
+  // Holds abort function for the active SSE stream, if any
+  const abortStreamRef = useRef<(() => void) | null>(null)
 
   const {
     messages,
     addTextMessage,
+    startStreamingMessage,
+    appendToMessage,
     addMcpExecution,
     approveMcpExecution,
     denyMcpExecution,
@@ -72,6 +76,11 @@ export default function AiChatPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  // Abort any in-flight stream when the component unmounts
+  useEffect(() => {
+    return () => { abortStreamRef.current?.() }
+  }, [])
 
   // ── Step 2: execute approved tools once all decisions are in ─────────────────
 
@@ -94,21 +103,54 @@ export default function AiChatPage() {
       const result =
         approvedTools.length > 0
           ? await mcpExecute({ userQuery: session.userQuery, approvedTools })
-          : await analyzeBacktest({ userQuery: session.userQuery })
+          : null
 
-      const cards = result.evidence ? evidenceToCards(result.evidence) : undefined
-      if (cards) addResultCards(cards)
-
-      addTextMessage(result.advice, "ai")
+      if (result) {
+        const cards = result.evidence ? evidenceToCards(result.evidence) : undefined
+        if (cards) addResultCards(cards)
+        // For the MCP-execute path we still get a full response — stream it char by char
+        // to keep the UX consistent (typewriter feel without an extra round-trip).
+        const msgId = startStreamingMessage()
+        for (const char of result.advice) {
+          appendToMessage(msgId, char)
+          await new Promise<void>((r) => setTimeout(r, 4))
+        }
+      } else {
+        // No approved tools — fall back to streaming analyze
+        const msgId = startStreamingMessage()
+        setIsSending(true)
+        const abort = analyzeBacktestStream(
+          { userQuery: session.userQuery },
+          {
+            onMeta: (meta) => {
+              if (meta.evidence) {
+                const cards = evidenceToCards(meta.evidence as Parameters<typeof evidenceToCards>[0])
+                if (cards) addResultCards(cards)
+              }
+            },
+            onToken: (token) => appendToMessage(msgId, token),
+            onDone: () => setIsSending(false),
+            onError: (msg) => {
+              appendToMessage(msgId, `\n\n_Error: ${msg}_`)
+              setIsSending(false)
+            },
+          },
+        )
+        abortStreamRef.current = abort
+      }
     } catch {
       addTextMessage("Analysis failed. Please try again.", "ai")
     }
   }
 
-  // ── Step 1: inspect tools, show approval panels ───────────────────────────────
+  // ── Step 1: inspect tools, show approval panels / start stream ────────────────
 
   const handleSend = async () => {
     if (!input.trim() || isSending) return
+
+    // Abort any previous stream
+    abortStreamRef.current?.()
+    abortStreamRef.current = null
 
     const query = input.trim()
     setInput("")
@@ -119,11 +161,31 @@ export default function AiChatPage() {
       const inspection = await mcpInspect({ userQuery: query })
 
       if (inspection.plannedTools.length === 0) {
-        // MCP not configured → plain LLM analyze
-        const result = await analyzeBacktest({ userQuery: query })
-        addTextMessage(result.advice, "ai")
-        return
-      }
+      const msgId = startStreamingMessage()
+      const abort = analyzeBacktestStream(
+        { userQuery: query },
+        {
+          onMeta: (meta) => {
+            if (meta.evidence) {
+              const cards = evidenceToCards(meta.evidence as Parameters<typeof evidenceToCards>[0])
+              if (cards) addResultCards(cards)
+            }
+          },
+          onToken: (token) => {
+            appendToMessage(msgId, token)
+          },
+          onDone: () => {
+            setIsSending(false)
+          },
+          onError: (msg) => {
+            appendToMessage(msgId, `\n\n_Error: ${msg}_`)
+            setIsSending(false)
+          },
+        },
+      )
+      abortStreamRef.current = abort
+      return
+}
 
       const toolCount = inspection.plannedTools.length
       addTextMessage(
@@ -152,7 +214,10 @@ export default function AiChatPage() {
         "ai",
       )
     } finally {
-      setIsSending(false)
+      // Only clear isSending if we're NOT in a streaming path (streaming clears it in onDone/onError)
+      if (!abortStreamRef.current) {
+        setIsSending(false)
+      }
     }
   }
 
