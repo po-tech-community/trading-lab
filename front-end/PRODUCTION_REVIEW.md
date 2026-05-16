@@ -24,15 +24,13 @@ The scope and technical depth are genuinely above average for student work. Inte
 - Unit tests on the core calculation engine
 - Docker Compose for local infra
 
-The issues below are fixable gaps, not signs of bad fundamentals.
-
 ---
 
 ## Executive Summary
 
 | Status | Count |
 |--------|-------|
-| 🔴 Must-fix before showing | 4 |
+| 🔴 Must-fix | 0 — all resolved |
 | 🟠 Should fix soon | 5 |
 | 🟡 Minor / tech debt | 8 |
 
@@ -44,11 +42,10 @@ The issues below are fixable gaps, not signs of bad fundamentals.
 
 **Rating: ✅ Strong**
 
-Full email/password + Google OAuth 2.0 implementation. Dual-token pattern: 15-minute JWT access token + 7-day refresh token in an HttpOnly cookie. Token rotation on refresh. Soft-delete aware (deletedAt). Audit log on every auth event.
+Full email/password + Google OAuth 2.0 implementation. Dual-token pattern: 15-minute JWT access token + 7-day refresh token in an HttpOnly cookie. Token rotation on refresh. Soft-delete aware (`deletedAt`). Audit log on every auth event.
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🔴 Must-fix | `auth.controller.ts:176` | `secure: false` on refreshToken cookie — must be `true` in production; over HTTP the cookie is safe locally, but deploying as-is exposes the refresh token in transit |
 | 🟡 Minor | `auth.service.ts:125–138` | Google OAuth state is the callback URL string, not a random CSRF nonce — acceptable for MVP but a proper nonce is best practice |
 | 🟡 Minor | `auth.service.ts:279–302` | Refresh tokens are stateless (no server-side store) — valid tokens cannot be revoked if compromised |
 
@@ -59,6 +56,7 @@ Full email/password + Google OAuth 2.0 implementation. Dual-token pattern: 15-mi
 **Rating: ✅ Excellent**
 
 The strongest part of the project. Single-asset and multi-asset DCA simulation with:
+
 - Daily / weekly / monthly schedules with correct UTC midnight alignment and month-end day clamping
 - Take-profit and stop-loss triggers
 - `BigNumber.js` throughout — no floating-point drift
@@ -69,8 +67,7 @@ The strongest part of the project. Single-asset and multi-asset DCA simulation w
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🔴 Must-fix | `backtest.controller.ts:25` | `@Public()` on all backtest endpoints — unauthenticated users can trigger expensive external API calls (CoinGecko / AlphaVantage). Rate limits on those free-tier APIs will be exhausted quickly in class. Add `JwtAuthGuard` or at minimum IP-level throttling |
-| 🟠 Should-fix | `price.service.ts:148, 268` | No timeout on `fetch()` calls to CoinGecko and AlphaVantage — a slow API response hangs the request indefinitely. Add `AbortSignal.timeout(10_000)` |
+| 🟠 Should-fix | `price.service.ts:148, 268` | No timeout on `fetch()` calls to CoinGecko and AlphaVantage — a slow API response hangs the request indefinitely |
 | 🟡 Minor | `price.service.ts:139, 266` | `data: any` for external API responses — type the CoinGecko and AlphaVantage shapes |
 
 ---
@@ -85,8 +82,8 @@ Notable: the inspect → approve → execute pattern is correctly implemented, l
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🟠 Should-fix | `ai.service.ts:137–151` | `buildSuggestedActions` returns hardcoded strings regardless of the backtest result — the AI response says smart things but the action chips are static. Either remove them or generate them from the LLM output |
-| 🟠 Should-fix | `mcp-runtime.service.ts` | MCP servers are expected at hardcoded provider IDs (`backtest-context`, `market-snapshot`, `portfolio-diagnostics`). If the env doesn't configure them, the runtime logs a warning but continues silently. The MCP setup is not documented in a README |
+| 🟠 Should-fix | `ai.service.ts:137–151` | `buildSuggestedActions` returns hardcoded strings regardless of the backtest result — the AI response says smart things but the action chips are static |
+| 🟠 Should-fix | `mcp-runtime.service.ts` | MCP servers are expected at hardcoded provider IDs. If the env doesn't configure them, the runtime logs a warning and continues silently. The MCP setup is not documented in a README |
 | 🟡 Minor | `llm.service.ts` | No timeout on OpenAI streaming — a stalled stream will hold the SSE connection open indefinitely |
 
 ---
@@ -95,7 +92,7 @@ Notable: the inspect → approve → execute pattern is correctly implemented, l
 
 **Rating: ✅ Good**
 
-MongoDB schema with soft delete (`deletedAt`), Google account linking, and password change with `currentPassword` verification. `PATCH /users/me`, `DELETE /users/me`, `GET /users/me` are all implemented and audited.
+MongoDB schema with soft delete (`deletedAt`), Google account linking, and password change with `currentPassword` verification. `PATCH /users/me`, `DELETE /users/me`, `GET /users/me` all implemented and audited.
 
 No open issues.
 
@@ -105,7 +102,7 @@ No open issues.
 
 **Rating: ✅ Good**
 
-Logs auth events (`register`, `login`, `logout`, `refresh`, `profile_update`, `soft_delete`) and AI events (`mcp_discovery`, `mcp_tool_execution`) to MongoDB. Non-blocking — errors are caught and logged rather than bubbling up. Good pattern.
+Logs auth events (`register`, `login`, `logout`, `refresh`, `profile_update`, `soft_delete`) and AI events (`mcp_discovery`, `mcp_tool_execution`) to MongoDB. Non-blocking — errors are caught and logged rather than bubbling up.
 
 No open issues.
 
@@ -113,7 +110,7 @@ No open issues.
 
 ### Infrastructure & Configuration
 
-**Rating: 🟠 Fair — one real bug**
+**Rating: 🟡 Good**
 
 - CORS configured with exact origin matching (not `*`) — correct
 - `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` — correct
@@ -124,9 +121,10 @@ No open issues.
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🔴 Must-fix | `package.json` | `@nestjs/core: "^10.4.22"` while `@nestjs/common` and `@nestjs/platform-express` are at `"^11.0.1"` — mixed NestJS major versions. This is a real bug risk. Run `npm install @nestjs/core@^11` to align |
 | 🟠 Should-fix | `.env` / repo root | No `.env.example` committed — new developers have no record of required env vars (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `OPENAI_API_KEY`, etc.) |
 | 🟡 Minor | `main.ts:82` | `console.log` for startup messages — use NestJS `Logger` for consistency |
+
+> **Note:** `npm audit` reports 22 vulnerabilities (4 critical, 7 high) in `node_modules`. Run `npm audit` in `back-end/` to review before any production deployment.
 
 ---
 
@@ -160,7 +158,6 @@ Clean component hierarchy, proper use of React Query for server state, Context f
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🔴 Must-fix | `src/components/FloatingAiChat.tsx` | File still exists in the source tree even though it was removed from the render tree — dead code that confuses readers and inflates the bundle |
 | 🟡 Minor | `src/components/ai/MarkdownContent.tsx` | Duplicate of `src/components/ui/MarkdownContent.tsx` — one should be deleted |
 
 ---
@@ -248,29 +245,14 @@ No test framework installed. Acceptable for MVP; needed before any real user tra
 
 | Category | Score | Notes |
 |----------|-------|-------|
-| **Backend: Auth** | ✅ 8/10 | Solid dual-token + Google OAuth; fix `secure: false` cookie |
+| **Backend: Auth** | ✅ 9/10 | Solid dual-token + Google OAuth; cookie security fixed |
 | **Backend: Backtest Engine** | ✅ 9/10 | Best part of the project; BigNumber, triggers, real data |
 | **Backend: AI / MCP** | ✅ 8/10 | Cutting-edge; hardcoded suggested actions is the only real gap |
 | **Backend: Users / Audit** | ✅ 9/10 | Soft delete, account linking, non-blocking audit — all correct |
-| **Backend: Infrastructure** | 🟠 6/10 | Mixed NestJS v10/v11 is a real bug; missing `.env.example` |
+| **Backend: Infrastructure** | 🟡 7/10 | NestJS version fixed; missing `.env.example` remains |
 | **Backend: Tests** | 🟡 5/10 | Core engine tested; auth/price/history not covered |
 | **Frontend: Architecture** | ✅ 9/10 | Clean, modern, correct patterns |
 | **Frontend: TypeScript** | 🟡 7/10 | Build passes; pervasive `any` |
 | **Frontend: Performance** | 🟡 5/10 | No code splitting |
 | **Frontend: Tests** | 🟡 0/10 | None installed |
-| **Overall** | **7.3 / 10** | MVP-ready; fix the 4 must-fixes before sharing |
-
----
-
-## Must-Fix — All Resolved ✅
-
-| # | Where | Fix | Status |
-|---|-------|-----|--------|
-| 1 | `back-end/package.json` | `@nestjs/core` aligned to `^11.0.1` to match rest of NestJS; `npm install` run | ✅ Fixed |
-| 2 | `auth.controller.ts` | `secure: false` → `secure: process.env.NODE_ENV === 'production'` in both `setRefreshTokenCookie` and `clearRefreshTokenCookie` | ✅ Fixed |
-| 3 | `backtest.controller.ts` | `@Public()` removed; `@UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` added at controller level | ✅ Fixed |
-| 4 | `src/components/FloatingAiChat.tsx` | File deleted | ✅ Fixed |
-
-**Backend build is clean** — `tsc --noEmit` exits 0 after all changes.
-
-> **Note:** `npm audit` reports 22 vulnerabilities (4 critical, 7 high) in the backend `node_modules`. Run `npm audit` in `back-end/` to review and address before any production deployment.
+| **Overall** | **7.5 / 10** | MVP-ready and resume-ready |
