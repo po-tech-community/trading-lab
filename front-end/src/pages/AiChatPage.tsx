@@ -8,15 +8,18 @@ import { ChatPanel } from "./ai-chat/ChatPanel"
 import { useMcpChat } from "@/hooks/use-mcp-chat"
 import {
   analyzeBacktestStream,
+  buildBacktestContext,
   mcpInspect,
   mcpExecute,
   evidenceToCards,
   type McpPlannedTool,
 } from "@/lib/ai-api";
+import type { BacktestSummary, BacktestTrade } from "@/lib/backtest-api";
 
 // Tracks the in-flight approval session across approve/deny callbacks.
 interface PendingSession {
   userQuery: string;
+  queryWithHistory: string;
   // decisions keyed by executionId from useMcpChat
   decisions: Map<string, {
     providerId: string;
@@ -24,6 +27,119 @@ interface PendingSession {
     approved: boolean | null;
   }>;
 }
+
+const backtestSessions: Array<{
+  id: string;
+  label: string;
+  summary: BacktestSummary;
+  trades: BacktestTrade[];
+  config: {
+    mode: "single" | "portfolio";
+    symbol?: string;
+    assets?: Array<{ symbol: string; weight: number }>;
+    amount?: number;
+    frequency?: string;
+    startDate?: number;
+    endDate?: number;
+  };
+}> = [
+  {
+    id: "none",
+    label: "No backtest",
+    summary: {
+      totalInvested: 0,
+      currentValue: 0,
+      totalReturnPercentage: 0,
+      totalHoldings: 0,
+      numberOfPurchases: 0,
+      realizedProfit: 0,
+      unrealizedValue: 0,
+    },
+    trades: [],
+    config: { mode: "single" },
+  },
+  {
+    id: "latest-dca",
+    label: "Latest DCA result",
+    summary: {
+      totalInvested: 5400,
+      currentValue: 6150,
+      totalReturnPercentage: 13.9,
+      totalHoldings: 0,
+      numberOfPurchases: 24,
+      realizedProfit: 450,
+      unrealizedValue: 750,
+    },
+    trades: [
+      {
+        date: Date.now() - 1000 * 60 * 60 * 24 * 45,
+        type: "takeProfit",
+        price: 42000,
+        units: 0.05,
+        profit: 150,
+        sellAction: 100,
+      },
+      {
+        date: Date.now() - 1000 * 60 * 60 * 24 * 12,
+        type: "stopLoss",
+        price: 38000,
+        units: 0.02,
+        profit: -60,
+        sellAction: 100,
+      },
+    ],
+    config: {
+      mode: "single",
+      symbol: "BTC",
+      amount: 225,
+      frequency: "weekly",
+      startDate: Date.now() - 1000 * 60 * 60 * 24 * 365,
+      endDate: Date.now(),
+    },
+  },
+  {
+    id: "latest-portfolio",
+    label: "Latest portfolio result",
+    summary: {
+      totalInvested: 12000,
+      currentValue: 13800,
+      totalReturnPercentage: 15,
+      totalHoldings: 0,
+      numberOfPurchases: 24,
+      realizedProfit: 600,
+      unrealizedValue: 1800,
+    },
+    trades: [
+      {
+        date: Date.now() - 1000 * 60 * 60 * 24 * 40,
+        type: "takeProfit",
+        price: 3200,
+        units: 0.3,
+        profit: 120,
+        sellAction: 100,
+      },
+      {
+        date: Date.now() - 1000 * 60 * 60 * 24 * 20,
+        type: "stopLoss",
+        price: 2150,
+        units: 0.2,
+        profit: -80,
+        sellAction: 100,
+      },
+    ],
+    config: {
+      mode: "portfolio",
+      assets: [
+        { symbol: "BTC", weight: 60 },
+        { symbol: "ETH", weight: 40 },
+      ],
+      amount: 500,
+      frequency: "weekly",
+      startDate: Date.now() - 1000 * 60 * 60 * 24 * 365,
+      endDate: Date.now(),
+    },
+  },
+];
 
 /**
  * Build a compact inputPreview for McpExecutionPanel.
@@ -45,8 +161,10 @@ function buildInputPreview(tool: McpPlannedTool): Record<string, unknown> {
 export default function AiChatPage() {
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [selectedBacktestId, setSelectedBacktestId] = useState("latest-dca")
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const pendingRef = useRef<PendingSession | null>(null)
   // Holds abort function for the active SSE stream, if any
   const abortStreamRef = useRef<(() => void) | null>(null)
@@ -60,6 +178,7 @@ export default function AiChatPage() {
     approveMcpExecution,
     denyMcpExecution,
     addResultCards,
+    clearMessages,
   } = useMcpChat()
 
   useEffect(() => {
@@ -82,6 +201,33 @@ export default function AiChatPage() {
     return () => { abortStreamRef.current?.() }
   }, [])
 
+  const selectedBacktest = backtestSessions.find((item) => item.id === selectedBacktestId)
+  const selectedBacktestContext =
+    selectedBacktest && selectedBacktest.id !== "none"
+      ? buildBacktestContext(selectedBacktest.summary, selectedBacktest.trades, selectedBacktest.config)
+      : undefined
+
+  const buildQueryWithHistory = (query: string) => {
+    const history = messages
+      .filter((msg) => !msg.mcpExecution && !msg.resultCards)
+      .slice(-6)
+      .map((msg) => `${msg.sender === "user" ? "User" : "Assistant"}: ${msg.text}`)
+      .join("\n")
+
+    return history ? `Previous conversation:\n${history}\n\nUser: ${query}` : query
+  }
+
+  const getAiErrorMessage = (error: unknown) => {
+    const status = (error as { status?: number })?.status
+    return status === 401
+      ? "Please log in to use the AI advisor."
+      : status === 429
+      ? "Too many requests. Please wait a moment before trying again."
+      : status === 503
+      ? "AI service is not configured. Please contact the administrator."
+      : "Sorry, I couldn't reach the AI advisor right now. Please try again."
+  }
+
   // ── Step 2: execute approved tools once all decisions are in ─────────────────
 
   const runAfterDecisions = async () => {
@@ -102,7 +248,11 @@ export default function AiChatPage() {
     try {
       const result =
         approvedTools.length > 0
-          ? await mcpExecute({ userQuery: session.userQuery, approvedTools })
+          ? await mcpExecute({
+              userQuery: session.queryWithHistory,
+              backtestContext: selectedBacktestContext,
+              approvedTools,
+            })
           : null
 
       if (result) {
@@ -120,7 +270,7 @@ export default function AiChatPage() {
         const msgId = startStreamingMessage()
         setIsSending(true)
         const abort = analyzeBacktestStream(
-          { userQuery: session.userQuery },
+          { userQuery: session.queryWithHistory, backtestContext: selectedBacktestContext },
           {
             onMeta: (meta) => {
               if (meta.evidence) {
@@ -158,34 +308,38 @@ export default function AiChatPage() {
     addTextMessage(query, "user")
 
     try {
-      const inspection = await mcpInspect({ userQuery: query })
+      const queryWithHistory = buildQueryWithHistory(query)
+      const inspection = await mcpInspect({
+        userQuery: queryWithHistory,
+        backtestContext: selectedBacktestContext,
+      })
 
       if (inspection.plannedTools.length === 0) {
-      const msgId = startStreamingMessage()
-      const abort = analyzeBacktestStream(
-        { userQuery: query },
-        {
-          onMeta: (meta) => {
-            if (meta.evidence) {
-              const cards = evidenceToCards(meta.evidence as Parameters<typeof evidenceToCards>[0])
-              if (cards) addResultCards(cards)
-            }
+        const msgId = startStreamingMessage()
+        const abort = analyzeBacktestStream(
+          { userQuery: queryWithHistory, backtestContext: selectedBacktestContext },
+          {
+            onMeta: (meta) => {
+              if (meta.evidence) {
+                const cards = evidenceToCards(meta.evidence as Parameters<typeof evidenceToCards>[0])
+                if (cards) addResultCards(cards)
+              }
+            },
+            onToken: (token) => {
+              appendToMessage(msgId, token)
+            },
+            onDone: () => {
+              setIsSending(false)
+            },
+            onError: (msg) => {
+              appendToMessage(msgId, `\n\n_Error: ${msg}_`)
+              setIsSending(false)
+            },
           },
-          onToken: (token) => {
-            appendToMessage(msgId, token)
-          },
-          onDone: () => {
-            setIsSending(false)
-          },
-          onError: (msg) => {
-            appendToMessage(msgId, `\n\n_Error: ${msg}_`)
-            setIsSending(false)
-          },
-        },
-      )
-      abortStreamRef.current = abort
-      return
-}
+        )
+        abortStreamRef.current = abort
+        return
+      }
 
       const toolCount = inspection.plannedTools.length
       addTextMessage(
@@ -193,7 +347,11 @@ export default function AiChatPage() {
         "ai",
       )
 
-      pendingRef.current = { userQuery: query, decisions: new Map() }
+      pendingRef.current = {
+        userQuery: query,
+        queryWithHistory,
+        decisions: new Map(),
+      }
 
       for (const tool of inspection.plannedTools) {
         const executionId = addMcpExecution({
@@ -202,17 +360,14 @@ export default function AiChatPage() {
           inputPreview: buildInputPreview(tool),
           status: "pending",
         })
-        pendingRef.current.decisions.set(executionId, {
+        pendingRef.current?.decisions.set(executionId, {
           providerId: tool.providerId,
           toolName: tool.toolName,
           approved: null,
         })
       }
-    } catch {
-      addTextMessage(
-        "Sorry, I couldn't reach the AI advisor right now. Please try again.",
-        "ai",
-      )
+    } catch (error) {
+      addTextMessage(getAiErrorMessage(error), "ai")
     } finally {
       // Only clear isSending if we're NOT in a streaming path (streaming clears it in onDone/onError)
       if (!abortStreamRef.current) {
@@ -257,10 +412,19 @@ export default function AiChatPage() {
       />
 
       <div className="flex-1 flex gap-8 min-h-0">
-        <AiChatSidebar />
+        <AiChatSidebar
+          sessions={backtestSessions}
+          selectedSessionId={selectedBacktestId}
+          onSessionChange={setSelectedBacktestId}
+          onNewInvestigation={() => {
+            clearMessages()
+            inputRef.current?.focus()
+          }}
+        />
 
         <ChatPanel
           ref={scrollRef}
+          inputRef={inputRef}
           messages={messages}
           input={input}
           onInputChange={setInput}
