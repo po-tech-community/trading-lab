@@ -31,8 +31,12 @@ export async function apiClient<T>(
     defaultHeaders["Authorization"] = `Bearer ${token}`;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
   const config: RequestInit = {
     ...options,
+    signal: options.signal ?? controller.signal,
     credentials: options.credentials ?? "include",
     headers: {
       ...defaultHeaders,
@@ -40,10 +44,15 @@ export async function apiClient<T>(
     },
   };
 
-  const response = await fetch(
-    `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}${endpoint}`,
-    config,
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}${endpoint}`,
+      config,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let errorData;

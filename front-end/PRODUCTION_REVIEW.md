@@ -31,7 +31,7 @@ The scope and technical depth are genuinely above average for student work. Inte
 | Status | Count |
 |--------|-------|
 | 🔴 Must-fix | 0 — all resolved |
-| 🟠 Should fix soon | 5 |
+| 🟠 Should fix soon | 0 — all resolved |
 | 🟡 Minor / tech debt | 8 |
 
 ---
@@ -67,7 +67,6 @@ The strongest part of the project. Single-asset and multi-asset DCA simulation w
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🟠 Should-fix | `price.service.ts:148, 268` | No timeout on `fetch()` calls to CoinGecko and AlphaVantage — a slow API response hangs the request indefinitely |
 | 🟡 Minor | `price.service.ts:139, 266` | `data: any` for external API responses — type the CoinGecko and AlphaVantage shapes |
 
 ---
@@ -82,8 +81,6 @@ Notable: the inspect → approve → execute pattern is correctly implemented, l
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🟠 Should-fix | `ai.service.ts:137–151` | `buildSuggestedActions` returns hardcoded strings regardless of the backtest result — the AI response says smart things but the action chips are static |
-| 🟠 Should-fix | `mcp-runtime.service.ts` | MCP servers are expected at hardcoded provider IDs. If the env doesn't configure them, the runtime logs a warning and continues silently. The MCP setup is not documented in a README |
 | 🟡 Minor | `llm.service.ts` | No timeout on OpenAI streaming — a stalled stream will hold the SSE connection open indefinitely |
 
 ---
@@ -110,7 +107,7 @@ No open issues.
 
 ### Infrastructure & Configuration
 
-**Rating: 🟡 Good**
+**Rating: ✅ Good**
 
 - CORS configured with exact origin matching (not `*`) — correct
 - `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` — correct
@@ -121,7 +118,6 @@ No open issues.
 
 | Severity | File | Issue |
 |----------|------|-------|
-| 🟠 Should-fix | `.env` / repo root | No `.env.example` committed — new developers have no record of required env vars (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `OPENAI_API_KEY`, etc.) |
 | 🟡 Minor | `main.ts:82` | `console.log` for startup messages — use NestJS `Logger` for consistency |
 
 > **Note:** `npm audit` reports 22 vulnerabilities (4 critical, 7 high) in `node_modules`. Run `npm audit` in `back-end/` to review before any production deployment.
@@ -201,7 +197,6 @@ SSE streaming correctly implemented. Bearer token auto-injected.
 
 | Severity | Issue | Location |
 |----------|-------|----------|
-| 🟠 Should-fix | No request timeout — fetch can hang indefinitely | `api-client.ts` |
 | 🟡 Minor | `ApiError.data` typed as `any` | `api-client.ts:6` |
 | 🟢 Low | `VITE_API_URL` fallback hardcoded in two files | `api-client.ts:44`, `ai-api.ts:185` |
 
@@ -249,10 +244,10 @@ No test framework installed. Acceptable for MVP; needed before any real user tra
 | **Backend: Backtest Engine** | ✅ 9/10 | Best part of the project; BigNumber, triggers, real data |
 | **Backend: AI / MCP** | ✅ 8/10 | Cutting-edge; hardcoded suggested actions is the only real gap |
 | **Backend: Users / Audit** | ✅ 9/10 | Soft delete, account linking, non-blocking audit — all correct |
-| **Backend: Infrastructure** | 🟡 7/10 | NestJS version fixed; missing `.env.example` remains |
+| **Backend: Infrastructure** | ✅ 8/10 | NestJS version aligned; `.env.example` documented with MCP setup |
 | **Backend: Tests** | 🟡 5/10 | Core engine tested; auth/price/history not covered |
 | **Frontend: Architecture** | ✅ 9/10 | Clean, modern, correct patterns |
 | **Frontend: TypeScript** | 🟡 7/10 | Build passes; pervasive `any` |
 | **Frontend: Performance** | 🟡 5/10 | No code splitting |
 | **Frontend: Tests** | 🟡 0/10 | None installed |
-| **Overall** | **7.5 / 10** | MVP-ready and resume-ready |
+| **Overall** | **7.8 / 10** | MVP-ready and resume-ready |

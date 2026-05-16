@@ -134,19 +134,39 @@ export class AiService {
   }
 
   private buildSuggestedActions(input: AnalyzeAiDto): string[] {
-    const mode = input.backtestContext?.mode;
-    if (mode === 'portfolio') {
-      return [
-        'Compare weekly vs monthly frequency',
-        'Lower stop-loss aggressiveness by 10%',
-        'Reduce highest-risk asset weight and re-run',
-      ];
+    const context = input.backtestContext;
+    if (!context) return [];
+
+    const returnPct = context.summary.totalReturnPercentage;
+    const hasTrades = (context.trades?.length ?? 0) > 0;
+    const suggestions: string[] = [];
+
+    suggestions.push('Compare weekly vs monthly frequency');
+
+    if (context.mode === 'portfolio') {
+      suggestions.push(
+        returnPct < 0
+          ? 'Rebalance: reduce highest-risk asset weight and re-run'
+          : 'Reduce highest-weight asset by 10% and re-run',
+      );
+      suggestions.push(
+        hasTrades
+          ? 'Adjust trigger thresholds and compare results'
+          : 'Add a stop-loss trigger and compare results',
+      );
+    } else {
+      suggestions.push(
+        hasTrades
+          ? 'Adjust trigger thresholds and compare results'
+          : 'Add a take-profit trigger and compare results',
+      );
+      suggestions.push(
+        returnPct < 0
+          ? 'Extend the time period to capture a full market cycle'
+          : 'Run a wider stop-loss threshold test',
+      );
     }
 
-    return [
-      'Compare weekly vs monthly frequency',
-      'Lower sellAction by 10%',
-      'Run a wider stop-loss threshold test',
-    ];
+    return suggestions;
   }
 }

@@ -147,6 +147,7 @@ export class PriceService {
 
       const res = await fetch(url, {
         headers,
+        signal: AbortSignal.timeout(10_000),
       });
 
       if (res.status === 401) {
@@ -265,7 +266,7 @@ export class PriceService {
 
     let data: any;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
 
       if (!res.ok) {
         throw new InternalServerErrorException(
