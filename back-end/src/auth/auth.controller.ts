@@ -172,7 +172,7 @@ export class AuthController {
     res.cookie('refreshToken', token, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: Number(this.configService.get('REFRESH_TOKEN_MAX_AGE')),
     });
   }
@@ -181,7 +181,7 @@ export class AuthController {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
     });
   }
 }

@@ -1,51 +1,175 @@
-# TradingLab Front-End — Production Readiness Review
+# TradingLab — Full-Stack Production Readiness Review
 
 **Date:** 2026-05-17
 **Branch:** `refactor/refactor-for-production`
-**Stack:** React 19, TypeScript 5.9, Vite 7, TanStack Query v5, Tailwind CSS v4, shadcn/ui
+**Stack:** NestJS 11 · MongoDB · Redis · OpenAI · React 19 · TypeScript 5.9 · Vite 7 · TanStack Query v5 · Tailwind CSS v4
+
+---
+
+## Resume Assessment
+
+**Verdict: Yes — strong internship resume project.**
+
+The scope and technical depth are genuinely above average for student work. Interviewers will notice:
+
+- Real external API integration with proper error handling (CoinGecko, AlphaVantage)
+- MCP (Model Context Protocol) — cutting-edge, uses the official SDK correctly
+- Dual-token auth (JWT + HttpOnly refresh cookie) instead of a naive single-token approach
+- Full Google OAuth 2.0 flow implemented manually (not just a Passport shortcut)
+- Precision arithmetic with `BigNumber.js` for financial calculations
+- SSE token streaming for AI responses
+- Redis-backed rate limiting with cache fallback
+- MongoDB audit log (non-blocking, persisted)
+- Swagger/OpenAPI docs with real examples
+- Unit tests on the core calculation engine
+- Docker Compose for local infra
+
+The issues below are fixable gaps, not signs of bad fundamentals.
 
 ---
 
 ## Executive Summary
 
-The codebase has solid architectural foundations — clean component hierarchy, well-structured routing, proper use of Context + React Query for state, and a consistent design system. The build is clean and the app is MVP-ready. The open issues below are quality and tech-debt items, not blockers.
-
 | Status | Count |
 |--------|-------|
-| 🔴 Critical blockers | 0 |
-| 🟠 High priority | 3 |
-| 🟡 Medium priority | 8 |
-| 🟢 Low / polish | 6 |
+| 🔴 Must-fix before showing | 4 |
+| 🟠 Should fix soon | 5 |
+| 🟡 Minor / tech debt | 8 |
 
 ---
 
-## 1. Project Structure & Organization
+## Backend
 
-**Rating: ✅ 10/10**
+### Auth Module — `src/auth/`
 
-Well-organised directory layout with clear separation of concerns.
+**Rating: ✅ Strong**
 
-```
-src/
-  assets/        icons only
-  components/    shared UI (common/, ui/, mcp/, ai/, charts/)
-  hooks/         custom hooks
-  layouts/       MainLayout, AuthLayout
-  lib/           API clients, query client, utilities
-  pages/         route-level views
-  providers/     ChatProvider, QueryProvider
-  router/        route config + protected routes
-```
+Full email/password + Google OAuth 2.0 implementation. Dual-token pattern: 15-minute JWT access token + 7-day refresh token in an HttpOnly cookie. Token rotation on refresh. Soft-delete aware (deletedAt). Audit log on every auth event.
 
-No issues.
+| Severity | File | Issue |
+|----------|------|-------|
+| 🔴 Must-fix | `auth.controller.ts:176` | `secure: false` on refreshToken cookie — must be `true` in production; over HTTP the cookie is safe locally, but deploying as-is exposes the refresh token in transit |
+| 🟡 Minor | `auth.service.ts:125–138` | Google OAuth state is the callback URL string, not a random CSRF nonce — acceptable for MVP but a proper nonce is best practice |
+| 🟡 Minor | `auth.service.ts:279–302` | Refresh tokens are stateless (no server-side store) — valid tokens cannot be revoked if compromised |
 
 ---
 
-## 2. TypeScript & Type Safety
+### Backtest Module — `src/backtest/`
+
+**Rating: ✅ Excellent**
+
+The strongest part of the project. Single-asset and multi-asset DCA simulation with:
+- Daily / weekly / monthly schedules with correct UTC midnight alignment and month-end day clamping
+- Take-profit and stop-loss triggers
+- `BigNumber.js` throughout — no floating-point drift
+- Price data from CoinGecko (BTC, ETH) and AlphaVantage (AAPL, TSLA) with rate-limit handling
+- Parallel price fetching for multi-asset runs
+- Backtest history: save / list (last 20, sorted) / delete, scoped to the authenticated user
+- Unit tests covering daily, weekly, monthly schedules, and both trigger types
+
+| Severity | File | Issue |
+|----------|------|-------|
+| 🔴 Must-fix | `backtest.controller.ts:25` | `@Public()` on all backtest endpoints — unauthenticated users can trigger expensive external API calls (CoinGecko / AlphaVantage). Rate limits on those free-tier APIs will be exhausted quickly in class. Add `JwtAuthGuard` or at minimum IP-level throttling |
+| 🟠 Should-fix | `price.service.ts:148, 268` | No timeout on `fetch()` calls to CoinGecko and AlphaVantage — a slow API response hangs the request indefinitely. Add `AbortSignal.timeout(10_000)` |
+| 🟡 Minor | `price.service.ts:139, 266` | `data: any` for external API responses — type the CoinGecko and AlphaVantage shapes |
+
+---
+
+### AI Module — `src/ai/`
+
+**Rating: ✅ Strong**
+
+Sophisticated AI integration with three MCP servers (market snapshot, backtest context, portfolio diagnostics). Clean separation of concerns: `LlmService` handles OpenAI, `McpRuntimeService` handles tool discovery and execution, `PromptGeneratorService` builds the prompt.
+
+Notable: the inspect → approve → execute pattern is correctly implemented, letting the client control which MCP tools are actually run.
+
+| Severity | File | Issue |
+|----------|------|-------|
+| 🟠 Should-fix | `ai.service.ts:137–151` | `buildSuggestedActions` returns hardcoded strings regardless of the backtest result — the AI response says smart things but the action chips are static. Either remove them or generate them from the LLM output |
+| 🟠 Should-fix | `mcp-runtime.service.ts` | MCP servers are expected at hardcoded provider IDs (`backtest-context`, `market-snapshot`, `portfolio-diagnostics`). If the env doesn't configure them, the runtime logs a warning but continues silently. The MCP setup is not documented in a README |
+| 🟡 Minor | `llm.service.ts` | No timeout on OpenAI streaming — a stalled stream will hold the SSE connection open indefinitely |
+
+---
+
+### Users Module — `src/users/`
+
+**Rating: ✅ Good**
+
+MongoDB schema with soft delete (`deletedAt`), Google account linking, and password change with `currentPassword` verification. `PATCH /users/me`, `DELETE /users/me`, `GET /users/me` are all implemented and audited.
+
+No open issues.
+
+---
+
+### Audit Module — `src/audit/`
+
+**Rating: ✅ Good**
+
+Logs auth events (`register`, `login`, `logout`, `refresh`, `profile_update`, `soft_delete`) and AI events (`mcp_discovery`, `mcp_tool_execution`) to MongoDB. Non-blocking — errors are caught and logged rather than bubbling up. Good pattern.
+
+No open issues.
+
+---
+
+### Infrastructure & Configuration
+
+**Rating: 🟠 Fair — one real bug**
+
+- CORS configured with exact origin matching (not `*`) — correct
+- `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` — correct
+- Swagger docs at `/api/docs` with Bearer auth and full response examples
+- `LoggingInterceptor` on every request
+- Redis cache (optional) with in-memory fallback
+- Docker Compose for local dev (MongoDB + Redis)
+
+| Severity | File | Issue |
+|----------|------|-------|
+| 🔴 Must-fix | `package.json` | `@nestjs/core: "^10.4.22"` while `@nestjs/common` and `@nestjs/platform-express` are at `"^11.0.1"` — mixed NestJS major versions. This is a real bug risk. Run `npm install @nestjs/core@^11` to align |
+| 🟠 Should-fix | `.env` / repo root | No `.env.example` committed — new developers have no record of required env vars (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `OPENAI_API_KEY`, etc.) |
+| 🟡 Minor | `main.ts:82` | `console.log` for startup messages — use NestJS `Logger` for consistency |
+
+---
+
+### Testing — Backend
+
+**Rating: 🟡 Partial**
+
+7 spec files exist, covering the most important logic:
+
+| File | Coverage |
+|------|----------|
+| `calculation.service.spec.ts` | Daily / weekly / monthly DCA, take-profit, stop-loss triggers |
+| `run-dca-backtest.dto.spec.ts` | DTO validation edge cases |
+| `prompt-generator.service.spec.ts` | Prompt structure |
+| `llm.service.spec.ts` | LLM error handling |
+| `mcp-config.service.spec.ts` | MCP config |
+| `mcp-permission.service.spec.ts` | Tool permission decisions |
+| `app.controller.spec.ts` | Health check stub |
+
+**Gaps:** No tests for `AuthService`, `UsersService`, `PriceService`, `BacktestHistoryService`, or any controller. No e2e tests.
+
+---
+
+## Frontend
+
+### Architecture & Build
+
+**Rating: ✅ Excellent**
+
+Clean component hierarchy, proper use of React Query for server state, Context for UI/chat state. Protected route pattern is correct. Build is clean — `tsc --noEmit` exits 0.
+
+| Severity | File | Issue |
+|----------|------|-------|
+| 🔴 Must-fix | `src/components/FloatingAiChat.tsx` | File still exists in the source tree even though it was removed from the render tree — dead code that confuses readers and inflates the bundle |
+| 🟡 Minor | `src/components/ai/MarkdownContent.tsx` | Duplicate of `src/components/ui/MarkdownContent.tsx` — one should be deleted |
+
+---
+
+### TypeScript & Type Safety
 
 **Rating: 🟡 7/10 — build passes, pervasive `any` remains**
 
-`tsc --noEmit` exits 0 with zero errors. However, approximately 28 ESLint `no-explicit-any` violations remain across the codebase.
+`tsc --noEmit` exits 0. ~28 ESLint `no-explicit-any` violations remain.
 
 | File | Lines | Notes |
 |------|-------|-------|
@@ -53,270 +177,100 @@ No issues.
 | `src/components/mcp/McpExecutionPanel.tsx` | 12, 15, 81 | Input and result types |
 | `src/pages/dca-backtest/timeline-to-chart.ts` | 10–13 | Chart data transformation |
 | `src/pages/SettingsPage.tsx` | 51, 89 | Form handlers |
-| `src/pages/portfolio-backtest/PortfolioConfigCard.tsx` | 91, 102 | Config shape, resolver cast |
 | `src/hooks/use-auth.ts` | 129 | `as any` cast |
 
 ---
 
-## 3. Component Architecture & Reusability
-
-**Rating: ✅ 9/10 — minor violations**
-
-Good use of composition, shadcn/ui primitives, and container/presentational separation. Protected route pattern is clean.
-
-**React Fast Refresh Violations (10 ESLint errors)**
-
-Components that export a variant constant alongside the component itself break HMR:
-
-| File | Issue |
-|------|-------|
-| `src/components/ui/badge.tsx:112` | Exports `badgeVariants` + component |
-| `src/components/ui/button.tsx:188` | Exports `buttonVariants` + component |
-| `src/components/ui/form.tsx:167` | Mixed export |
-| `src/components/ui/raw_button.tsx:64` | Mixed export |
-| `src/components/ui/sidebar.tsx:609, 723` | Mixed export |
-| `src/components/ui/tabs.tsx:91` | Mixed export |
-| `src/providers/ChatProvider.tsx:79` | Exports constant + provider |
-
-**Empty Interface**
-
-```tsx
-// src/components/common/PageContainer.tsx:4
-interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {}
-// Use the parent type directly or add at least one prop
-```
-
----
-
-## 4. State Management
+### State Management
 
 **Rating: ✅ 8/10**
 
-Context API correctly scoped to chat/session state. React Query (TanStack v5) well-configured: 1-minute staleTime, smart retry logic. `use-auth`, `use-ai-models`, `use-mcp-chat` are clean, well-abstracted hooks.
+React Query well-configured (1-minute staleTime, smart retry). Context API scoped correctly.
 
-**`setState` Synchronously Inside `useEffect` (3 occurrences)**
+**`setState` inside `useEffect` — cascading renders:**
 
-| File | Lines | Impact |
-|------|-------|--------|
-| `src/pages/dca-backtest/PortfolioTrajectoryChart.tsx` | 79 | Cascading renders |
-| `src/pages/dca-backtest/TradeHistoryTable.tsx` | 78, 83 | Cascading renders |
-
-These cause two render cycles per update. Should be refactored to derived state or moved into event callbacks.
-
-**Missing `useEffect` Dependencies (2 occurrences)**
-
-| File | Line | Missing Dep |
-|------|------|-------------|
-| `src/components/ai/AiAdvisorPanel.tsx` | 113 | `setMessages` |
-| `src/components/common/SearchInput.tsx` | 22 | `localValue` |
+| File | Lines |
+|------|-------|
+| `src/pages/dca-backtest/PortfolioTrajectoryChart.tsx` | 79 |
+| `src/pages/dca-backtest/TradeHistoryTable.tsx` | 78, 83 |
 
 ---
 
-## 5. API & Data Fetching
+### API & Data Fetching
 
 **Rating: 🟡 7/10**
 
-Clean abstraction in `src/lib/api-client.ts`. Bearer token auto-injected from localStorage. SSE streaming correctly implemented in `analyzeBacktestStream()`.
-
-**Open Issues**
+SSE streaming correctly implemented. Bearer token auto-injected.
 
 | Severity | Issue | Location |
 |----------|-------|----------|
-| 🟠 High | No request timeout — fetch can hang indefinitely | `api-client.ts` |
-| 🟡 Medium | `ApiError.data` typed as `any` | `api-client.ts:6` |
-| 🟢 Low | `VITE_API_URL` fallback hardcoded in two places | `api-client.ts:44`, `ai-api.ts:185` |
+| 🟠 Should-fix | No request timeout — fetch can hang indefinitely | `api-client.ts` |
+| 🟡 Minor | `ApiError.data` typed as `any` | `api-client.ts:6` |
+| 🟢 Low | `VITE_API_URL` fallback hardcoded in two files | `api-client.ts:44`, `ai-api.ts:185` |
 
 ---
 
-## 6. Error Handling
-
-**Rating: 🟠 7/10**
-
-- `sonner` toasts for user-facing errors
-- React Error Boundary wraps `<Outlet />` in `MainLayout`
-- Zod validation on login/sign-up forms
-
-**Open Issues**
-
-| Severity | Issue |
-|----------|-------|
-| 🟠 High | No error logging service (Sentry, Datadog, etc.) |
-| 🟡 Medium | Generic "Request failed" messages without context |
-| 🟢 Low | `console.error` in `FloatingAiChat.tsx:64` — should use logging service |
-
----
-
-## 7. Performance
+### Performance
 
 **Rating: 🟡 5/10**
 
-**No route-based code splitting.** All pages load upfront. With heavy chart libraries (Recharts) and AI panels, this results in a large initial bundle.
+No route-based code splitting. Recharts + AI panels load on every page.
 
-**React Compiler Warnings (2)**
+React Compiler warnings (library limitations, not actionable):
 
-| File | Line | Note |
-|------|------|------|
-| `src/components/common/DataTable.tsx` | 61 | TanStack Table returns functions — not memoizable |
-| `src/pages/dca-backtest/StrategyConfigCard.tsx` | 112 | `watch()` incompatible with compiler |
-
-These are library limitations and block full compiler optimization.
-
-**Other gaps:**
-- No `vite-plugin-visualizer` to monitor bundle size
-- No `React.memo` / `useMemo` on expensive chart computations
+| File | Note |
+|------|------|
+| `src/components/common/DataTable.tsx:61` | TanStack Table returns functions — not memoizable |
+| `src/pages/dca-backtest/StrategyConfigCard.tsx:112` | `watch()` incompatible with compiler |
 
 ---
 
-## 8. Accessibility (a11y)
+### Testing — Frontend
 
-**Rating: ✅ 8/10**
+**Rating: 🟡 0/10 — no tests**
 
-- `aria-hidden` on decorative icons (LoginPage, SignUpPage)
-- `aria-label` on form controls
-- Dark mode via `next-themes` with system preference support
-- Semantic HTML in forms
-
-**Minor gaps:**
-- Chat message containers use `<div>` — consider `<article>` with `aria-live="polite"` for screen readers
-- Some icon-only buttons may lack explicit `aria-label`
+No test framework installed. Acceptable for MVP; needed before any real user traffic.
 
 ---
 
-## 9. Security
+### Minor / Polish
 
-**Rating: ✅ 8/10**
-
-- Google OAuth 2.0 properly integrated
-- No hardcoded credentials in codebase
-- Zod input validation on auth forms
-- `credentials: "include"` set correctly for cookies
-
-**Open Issues**
-
-| Severity | Issue |
-|----------|-------|
-| 🟡 Medium | `localStorage` for tokens is XSS-vulnerable — mitigate with a strict `Content-Security-Policy` header (server-side) |
-| 🟡 Medium | Confirm backend validates Google OAuth `redirect_uri` to prevent open redirect |
-
----
-
-## 10. Testing
-
-**Rating: 🟡 0/10 — no tests exist**
-
-No `.test.ts`, `.spec.ts`, or `__tests__` directories. No testing dependencies in `package.json`. Acceptable for MVP; should be addressed post-launch.
-
----
-
-## 11. Code Style & Linting
-
-**Rating: 🟡 6/10 — 33 ESLint violations**
-
-ESLint config is present and well-configured with TypeScript + React Hooks + React Refresh plugins.
-
-| Rule | Count |
-|------|-------|
-| `@typescript-eslint/no-explicit-any` | 28 |
-| `react-refresh/only-export-components` | 10 |
-| `react-hooks/exhaustive-deps` | 2 |
-| `react-hooks/rules-of-hooks` (purity) | 1 |
-| `@typescript-eslint/no-empty-object-type` | 1 |
-
-No pre-commit hook enforces linting. No Prettier configuration.
-
----
-
-## 12. Dependencies
-
-**Rating: ✅ 9/10**
-
-| Package | Version | Status |
-|---------|---------|--------|
-| React | 19.2.0 | Latest |
-| TypeScript | 5.9.3 | Recent |
-| Vite | 7.3.1 | Latest |
-| TanStack Query | 5.90.21 | Stable |
-| TanStack Table | 8.21.3 | Stable |
-| Tailwind CSS | 4.2.0 | Latest |
-| Recharts | — | Appropriate |
-| Zod | — | Industry standard |
-
-`tw-animate-css@1.4.0` maintenance status unverified. No Dependabot configured.
-
----
-
-## 13. Environment Variables
-
-**Rating: 🟡 6/10**
-
-`VITE_API_URL` is validated on startup via `src/lib/env.ts`. No `.env.example` file exists for onboarding new developers.
-
----
-
-## 14. Build Configuration
-
-**Rating: ✅ 9/10**
-
-`tsconfig.json` is correctly strict (`strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`). Path aliases aligned between tsconfig and vite.config. Build is clean.
-
-No production source maps configured. No `vite-plugin-visualizer` for bundle monitoring.
-
----
-
-## 15. CSS & Styling
-
-**Rating: ✅ 9/10**
-
-- Tailwind CSS v4 with `@tailwindcss/vite` plugin
-- HSL CSS variables for theming with dark mode support
-- `cn()` (clsx + tailwind-merge) correctly applied throughout
-- Semantic color naming: `primary`, `secondary`, `destructive`, `success`, `warning`, `info`
-
-`src/App.css` contains unused logo-animation styles.
-
----
-
-## 16. Routing
-
-**Rating: ✅ 8/10**
-
-React Router v6 with nested layouts, protected routes, and 404/403 fallbacks. Route `handle` objects provide breadcrumb data cleanly.
-
-**Open issues:**
-- No route-based code splitting (see Performance)
-- `/users` route is a placeholder stub
-- Role-based route guards exist (403 page) but guard logic not fully wired
-
----
-
-## 17. Dead Code
-
-**Rating: 🟡 Minor**
-
-| File | Issue |
-|------|-------|
-| `src/pages/dca-backtest/TradeHistoryTable.tsx:62` | `_portfolioSymbols` declared but not used |
+| Severity | File | Issue |
+|----------|------|-------|
+| 🟡 | `src/components/common/PageContainer.tsx:4` | Empty interface — use parent type directly |
+| 🟡 | `src/pages/dca-backtest/TradeHistoryTable.tsx:62` | `_portfolioSymbols` declared but unused |
+| 🟢 | `src/App.css` | Unused logo-animation styles |
+| 🟢 | React Fast Refresh (10 ESLint warnings) | `badgeVariants`, `buttonVariants` exported alongside components in `src/components/ui/` |
 
 ---
 
 ## Score Summary
 
-| Category | Score | Priority |
-|----------|-------|----------|
-| Project Structure | ✅ 10/10 | — |
-| TypeScript Safety | 🟡 7/10 | Medium |
-| Component Architecture | ✅ 9/10 | Low |
-| State Management | ✅ 8/10 | Medium |
-| API / Data Fetching | 🟡 7/10 | High |
-| Error Handling | 🟠 7/10 | High |
-| Performance | 🟡 5/10 | Medium |
-| Accessibility | ✅ 8/10 | Low |
-| Security | ✅ 8/10 | Low |
-| Testing | 🟡 0/10 | Medium (post-MVP) |
-| Code Style | 🟡 6/10 | Medium |
-| Dependencies | ✅ 9/10 | — |
-| Environment Config | 🟡 6/10 | Low |
-| Build Config | ✅ 9/10 | — |
-| CSS / Styling | ✅ 9/10 | — |
-| Routing | ✅ 8/10 | Low |
-| **Overall** | **7.1 / 10** | — |
+| Category | Score | Notes |
+|----------|-------|-------|
+| **Backend: Auth** | ✅ 8/10 | Solid dual-token + Google OAuth; fix `secure: false` cookie |
+| **Backend: Backtest Engine** | ✅ 9/10 | Best part of the project; BigNumber, triggers, real data |
+| **Backend: AI / MCP** | ✅ 8/10 | Cutting-edge; hardcoded suggested actions is the only real gap |
+| **Backend: Users / Audit** | ✅ 9/10 | Soft delete, account linking, non-blocking audit — all correct |
+| **Backend: Infrastructure** | 🟠 6/10 | Mixed NestJS v10/v11 is a real bug; missing `.env.example` |
+| **Backend: Tests** | 🟡 5/10 | Core engine tested; auth/price/history not covered |
+| **Frontend: Architecture** | ✅ 9/10 | Clean, modern, correct patterns |
+| **Frontend: TypeScript** | 🟡 7/10 | Build passes; pervasive `any` |
+| **Frontend: Performance** | 🟡 5/10 | No code splitting |
+| **Frontend: Tests** | 🟡 0/10 | None installed |
+| **Overall** | **7.3 / 10** | MVP-ready; fix the 4 must-fixes before sharing |
+
+---
+
+## Must-Fix — All Resolved ✅
+
+| # | Where | Fix | Status |
+|---|-------|-----|--------|
+| 1 | `back-end/package.json` | `@nestjs/core` aligned to `^11.0.1` to match rest of NestJS; `npm install` run | ✅ Fixed |
+| 2 | `auth.controller.ts` | `secure: false` → `secure: process.env.NODE_ENV === 'production'` in both `setRefreshTokenCookie` and `clearRefreshTokenCookie` | ✅ Fixed |
+| 3 | `backtest.controller.ts` | `@Public()` removed; `@UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` added at controller level | ✅ Fixed |
+| 4 | `src/components/FloatingAiChat.tsx` | File deleted | ✅ Fixed |
+
+**Backend build is clean** — `tsc --noEmit` exits 0 after all changes.
+
+> **Note:** `npm audit` reports 22 vulnerabilities (4 critical, 7 high) in the backend `node_modules`. Run `npm audit` in `back-end/` to review and address before any production deployment.
