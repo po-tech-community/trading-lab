@@ -1,5 +1,4 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import UITestPage from '@/examples/components/UITestPage';
 import MainLayout from '@/layouts/MainLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import SignUpPage from '@/pages/auth/SignUpPage';
@@ -39,11 +38,6 @@ export const router = createBrowserRouter([
     path: '/auth/google/callback',
     element: <GoogleAuthCallbackPage />,
     ...breadcrumb('Google Sign-In'),
-  },
-  {
-    path: 'ui-test-page',
-    element: <UITestPage />,
-    ...breadcrumb('UI Test'),
   },
   {
     path: '/home',
