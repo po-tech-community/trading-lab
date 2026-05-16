@@ -14,7 +14,7 @@ import {
   AllocationDiagnosticsCard,
   type AllocationDiagnosticsData,
 } from "@/components/mcp/ResultCards";
-import { MarkdownContent } from "@/components/ai/MarkdownContent";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import type { ChatMessage } from "@/hooks/use-mcp-chat";
 
 interface ChatPanelProps {
