@@ -1,6 +1,4 @@
-import { Search } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -51,7 +49,6 @@ export function AiChatSidebar({
           </SelectContent>
         </Select>
       </div>
-
       <CardContent className="flex-1 space-y-2 overflow-y-auto">
         <div className="p-3 rounded-md bg-muted cursor-pointer">
           <p className="text-xs text-primary mb-1">Current session</p>

@@ -148,8 +148,9 @@ export const StrategyConfigCard = forwardRef<StrategyConfigCardHandle, StrategyC
 
   return (
     <Card
+      id="strategy-config"
       className={cn(
-        "relative overflow-hidden shrink-0 py-6",
+        "relative overflow-hidden shrink-0 py-6 scroll-mt-6",
         isCollapsed
           ? "w-16 h-12 overflow-hidden"
           : "w-full lg:col-span-4 lg:w-[360px]",

@@ -1,8 +1,9 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -18,12 +19,13 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AiRateLimitGuard } from './guards/ai-rate-limit.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
+import type { Response } from 'express';
 
 @ApiTags('ai')
 @Controller('ai')
 @UseGuards(JwtAuthGuard, AiRateLimitGuard)
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(private readonly aiService: AiService) { }
 
   @Post('analyze')
   @ApiBearerAuth()
@@ -111,6 +113,61 @@ export class AiController {
       userId: user.sub,
       email: user.email,
     });
+  }
+
+  /**
+   * GET /ai/analyze/stream
+   *
+   * Server-Sent Events (SSE) alternative to POST /ai/analyze.
+   * The request body is passed as a URL-encoded JSON string in the `payload`
+   * query parameter so that the browser EventSource API (GET-only) can be used.
+   *
+   * Event stream format:
+   *   data: {"meta":{suggestedActions, evidence, mcp}}\n\n  — emitted once before tokens
+   *   data: {"token":"<chunk>"}\n\n                          — one per LLM token
+   *   data: [DONE]\n\n                                       — stream finished
+   *   data: {"error":"<message>"}\n\n                        — on error (then closes)
+   */
+  @Get('analyze/stream')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Stream AI analysis tokens via Server-Sent Events',
+    description:
+      'Pass the AnalyzeAiDto JSON as the `payload` query-string parameter. ' +
+      'The endpoint emits a `meta` event first, then individual `token` events, ' +
+      'and finally `[DONE]`.',
+  })
+  @ApiQuery({
+    name: 'payload',
+    description: 'URL-encoded JSON matching AnalyzeAiDto',
+    required: true,
+    type: String,
+  })
+  @ApiResponse({ status: 200, description: 'SSE stream opened' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 429, description: 'Too many AI analyze requests. Please retry later.' })
+  async analyzeStream(
+    @Query('payload') payload: string,
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Set SSE headers before any write
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering if present
+    res.flushHeaders();
+
+    let body: AnalyzeAiDto;
+    try {
+      body = JSON.parse(decodeURIComponent(payload)) as AnalyzeAiDto;
+    } catch {
+      res.write(`data: ${JSON.stringify({ error: 'Invalid payload JSON' })}\n\n`);
+      res.end();
+      return;
+    }
+
+    await this.aiService.analyzeStream(body, { userId: user.sub, email: user.email }, res);
   }
 
   @Post('mcp/inspect')

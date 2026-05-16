@@ -12,11 +12,13 @@
  *  - Retains mock summary cards as placeholders until L2-FE-3 is done
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/common/PageHeader";
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
+import { useChatContext } from "@/providers/ChatProvider";
 import {
   Card,
   CardContent,
@@ -45,16 +47,36 @@ const ASSET_LABELS: Record<string, string> = {
 };
 
 export default function PortfolioPage() {
+  const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
+
+  const { setLatestBacktest } = useChatContext();
 
   const mutation = useMutation({
     mutationFn: runPortfolioBacktest,
     onSuccess: (data) => {
       setResult(data);
       toast.success("Portfolio backtest completed");
+      // ENH-2: make result available to FloatingAiChat globally
+      const symbols = data.summary.assets.map((a) => a.symbol).join(" / ");
+      setLatestBacktest({
+        summary: {
+          totalInvested: data.summary.totalInvested,
+          currentValue: data.summary.currentValue,
+          totalReturnPercentage: data.summary.totalReturnPercentage,
+          totalHoldings: data.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
+          numberOfPurchases: data.summary.numberOfPurchases,
+          realizedProfit: data.summary.realizedProfit,
+          unrealizedValue: data.summary.unrealizedValue,
+        },
+        trades: data.trades,
+        mode: "portfolio",
+        label: `${symbols} portfolio backtest`,
+      });
     },
     onError: (err) => {
       setSubmitError(
@@ -69,6 +91,15 @@ export default function PortfolioPage() {
   }
 
   const chartData = result ? timelineToChartData(result.timeline) : [];
+
+  useEffect(() => {
+    if (!location.hash) return;
+    const frame = window.requestAnimationFrame(() => {
+      setIsCollapsed(false);
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash]);
 
   const assetSeriesOptions = useMemo(() => {
     if (!result) return [];
@@ -146,7 +177,7 @@ export default function PortfolioPage() {
             }
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div id="allocation-overview" className="grid gap-4 md:grid-cols-2 scroll-mt-6">
             <CompositionPieChart
               assets={
                 result

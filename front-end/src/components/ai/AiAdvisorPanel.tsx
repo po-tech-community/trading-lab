@@ -42,7 +42,8 @@ import {
   type AiAnalyzeResponse,
   type SuggestedAction,
 } from "@/lib/ai-api";
-import { MarkdownContent } from "@/components/ai/MarkdownContent";
+import { useChatContext, type PanelMessage as Message } from "@/providers/ChatProvider";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
  
@@ -57,18 +58,8 @@ const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 function buildSummaryText(summary: BacktestSummary): string {
   return `Invested ${currency.format(summary.totalInvested)} → ${currency.format(summary.currentValue)} (${pct(summary.totalReturnPercentage)} ROI) over ${summary.numberOfPurchases} purchases.`;
 }
- 
-// ── Types ─────────────────────────────────────────────────────────────────────
- 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  /** Raw string labels from backend — parsed to SuggestedAction for chip rendering */
-  suggestedActions?: string[];
-  isLoading?: boolean;
-}
- 
+
+
 export interface ChatProps {
   summary: BacktestSummary | null;
   trades?: BacktestTrade[];
@@ -102,7 +93,8 @@ export function AiAdvisorPanel({
   config,
   onSuggestedAction,
 }: AiAdvisorPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  // ENH-3: messages live in context so they survive route changes and layout re-mounts
+  const { panelMessages: messages, setPanelMessages: setMessages } = useChatContext();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);

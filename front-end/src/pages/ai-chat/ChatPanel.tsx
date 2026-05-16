@@ -1,12 +1,23 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import type { ForwardedRef, KeyboardEvent } from "react";
 import { Bot, User, Send, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { McpExecutionPanel } from "@/components/mcp/McpExecutionPanel";
 import { MarketSnapshotCard, RiskCheckCard, AllocationDiagnosticsCard } from "@/components/mcp/ResultCards";
+import type { MarketSnapshotData, RiskCheckData, AllocationDiagnosticsData } from "@/components/mcp/ResultCards";
 import { MarkdownContent } from "@/components/ai/MarkdownContent";
 import type { ChatMessage } from "@/hooks/use-mcp-chat";
 
@@ -19,6 +30,27 @@ interface ChatPanelProps {
   onMcpApprove?: (id: string) => void;
   onMcpDeny?: (id: string) => void;
   isSending?: boolean;
+}
+
+type ResultDialogState =
+  | { type: "market"; data: MarketSnapshotData }
+  | { type: "risk"; data: RiskCheckData }
+  | { type: "allocation"; data: AllocationDiagnosticsData }
+  | null;
+
+const WATCHLIST_STORAGE_KEY = "trading-lab-watchlist";
+
+function formatPercent(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function readWatchlist() {
+  try {
+    const value = JSON.parse(localStorage.getItem(WATCHLIST_STORAGE_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -35,6 +67,9 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
     { messages, input, inputRef, onInputChange, onSend, onMcpApprove, onMcpDeny, isSending = false },
     scrollRef: ForwardedRef<HTMLDivElement>,
   ) => {
+    const navigate = useNavigate();
+    const [resultDialog, setResultDialog] = useState<ResultDialogState>(null);
+
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -42,7 +77,42 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
       }
     };
 
+    const handleViewMarketDetails = (data: MarketSnapshotData) => {
+      setResultDialog({ type: "market", data });
+    };
+
+    const handleAddToWatchlist = (data: MarketSnapshotData) => {
+      const saved = readWatchlist();
+      const symbol = data.symbol.trim().toUpperCase();
+      if (saved.includes(symbol)) {
+        toast.info(`${symbol} is already on your watchlist`);
+        return;
+      }
+      localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify([...saved, symbol]));
+      toast.success(`${symbol} added to watchlist`);
+    };
+
+    const handleAdjustStrategy = () => {
+      navigate("/home/backtest#strategy-config");
+      toast.info("Opening strategy configuration");
+    };
+
+    const handleRebalance = () => {
+      navigate("/home/portfolio#portfolio-config");
+      toast.info("Opening portfolio configuration for rebalancing");
+    };
+
+    const handleViewAllocation = (data: AllocationDiagnosticsData) => {
+      if (Object.keys(data.currentAllocation).length > 0) {
+        setResultDialog({ type: "allocation", data });
+        return;
+      }
+      navigate("/home/portfolio#allocation-overview");
+      toast.info("Opening portfolio allocation");
+    };
+
     return (
+      <>
       <Card className="flex-1 flex flex-col overflow-hidden relative gap-0 py-0">
         {/* Panel header */}
         <div className="p-6 border-b flex items-center justify-between bg-card">
@@ -121,22 +191,22 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                     {msg.resultCards.marketSnapshot && (
                       <MarketSnapshotCard
                         data={msg.resultCards.marketSnapshot}
-                        onViewDetails={() => console.log('View market details')}
-                        onAddToWatchlist={() => console.log('Add to watchlist')}
+                        onViewDetails={() => handleViewMarketDetails(msg.resultCards!.marketSnapshot!)}
+                        onAddToWatchlist={() => handleAddToWatchlist(msg.resultCards!.marketSnapshot!)}
                       />
                     )}
                     {msg.resultCards.riskCheck && (
                       <RiskCheckCard
                         data={msg.resultCards.riskCheck}
-                        onViewReport={() => console.log('View risk report')}
-                        onAdjustStrategy={() => console.log('Adjust strategy')}
+                        onViewReport={() => setResultDialog({ type: "risk", data: msg.resultCards!.riskCheck! })}
+                        onAdjustStrategy={handleAdjustStrategy}
                       />
                     )}
                     {msg.resultCards.allocationDiagnostics && (
                       <AllocationDiagnosticsCard
                         data={msg.resultCards.allocationDiagnostics}
-                        onRebalance={() => console.log('Rebalance portfolio')}
-                        onViewAllocation={() => console.log('View allocation')}
+                        onRebalance={handleRebalance}
+                        onViewAllocation={() => handleViewAllocation(msg.resultCards!.allocationDiagnostics!)}
                       />
                     )}
                   </div>
@@ -177,6 +247,94 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
           </p>
         </div>
       </Card>
+      <Dialog open={!!resultDialog} onOpenChange={(open) => !open && setResultDialog(null)}>
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>
+              {resultDialog?.type === "market" && `${resultDialog.data.symbol} Market Details`}
+              {resultDialog?.type === "risk" && "Risk Report"}
+              {resultDialog?.type === "allocation" && "Allocation Details"}
+            </DialogTitle>
+            <DialogDescription>
+              {resultDialog?.type === "market" && "Snapshot metrics returned by the AI market tool."}
+              {resultDialog?.type === "risk" && "Risk metrics returned by the AI risk tools."}
+              {resultDialog?.type === "allocation" && "Current allocation and suggested trades returned by the AI diagnostics tools."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            {resultDialog?.type === "market" && (
+              <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                <div className="rounded-md border p-3">
+                  <p className="text-muted-foreground">Price</p>
+                  <p className="text-lg font-semibold">${resultDialog.data.price.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border p-3">
+                  <p className="text-muted-foreground">24h Change</p>
+                  <p className="text-lg font-semibold">{formatPercent(resultDialog.data.changePercent)}</p>
+                </div>
+                <div className="rounded-md border p-3">
+                  <p className="text-muted-foreground">Volume</p>
+                  <p className="font-medium">{resultDialog.data.volume.toLocaleString()}</p>
+                </div>
+                <div className="rounded-md border p-3">
+                  <p className="text-muted-foreground">Market Cap</p>
+                  <p className="font-medium">{resultDialog.data.marketCap.toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+            {resultDialog?.type === "risk" && (
+              <div className="space-y-3 text-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">Overall Risk</p>
+                    <p className="text-lg font-semibold capitalize">{resultDialog.data.overallRisk}</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">Volatility</p>
+                    <p className="text-lg font-semibold">{resultDialog.data.volatility.toFixed(2)}%</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">Max Drawdown</p>
+                    <p className="font-medium">{resultDialog.data.maxDrawdown.toFixed(2)}%</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground">VaR (95%)</p>
+                    <p className="font-medium">{resultDialog.data.var95.toFixed(2)}%</p>
+                  </div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <p className="text-muted-foreground">Stress Test</p>
+                  <p className="font-medium">{resultDialog.data.stressTestResult}</p>
+                </div>
+              </div>
+            )}
+            {resultDialog?.type === "allocation" && (
+              <div className="space-y-4 text-sm">
+                <div className="grid gap-2">
+                  {Object.entries(resultDialog.data.currentAllocation).map(([symbol, weight]) => (
+                    <div key={symbol} className="flex items-center justify-between rounded-md border p-3">
+                      <span className="font-medium">{symbol}</span>
+                      <span>{weight.toFixed(2)}%</span>
+                    </div>
+                  ))}
+                </div>
+                {resultDialog.data.suggestedTrades.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium">Suggested trades</p>
+                    {resultDialog.data.suggestedTrades.map((trade) => (
+                      <div key={`${trade.symbol}-${trade.action}`} className="flex items-center justify-between rounded-md border p-3">
+                        <span className="font-medium">{trade.action.toUpperCase()} {trade.symbol}</span>
+                        <span>{trade.shares} shares · ${trade.estimatedValue.toFixed(0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+      </>
     );
   },
 );

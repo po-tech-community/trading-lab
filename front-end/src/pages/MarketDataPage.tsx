@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/common/PageHeader"
 import { LineChart, TrendingUp, ArrowDownRight, ArrowUpRight, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useEffect } from "react"
+import { useLocation } from "react-router-dom"
 
 const MOCK_MARKETS = [
   { symbol: "BTC / USD", price: "$62,450", change: "+2.4%", direction: "up" as const, volume: "$1.2B" },
@@ -13,6 +15,13 @@ const MOCK_MARKETS = [
 ]
 
 export default function MarketDataPage() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!location.hash) return
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [location.hash])
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -75,7 +84,7 @@ export default function MarketDataPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card id="market-watchlist" className="scroll-mt-6">
         <CardHeader>
           <CardTitle className="text-base">Watchlist (mock data)</CardTitle>
           <CardDescription>Static list of a few instruments with price and daily change.</CardDescription>
@@ -121,4 +130,3 @@ export default function MarketDataPage() {
     </div>
   )
 }
-
