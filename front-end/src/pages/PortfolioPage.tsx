@@ -12,12 +12,18 @@
  *  - Retains mock summary cards as placeholders until L2-FE-3 is done
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { Minimize2, Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/common/PageHeader";
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
+import type { SuggestedAction } from "@/lib/ai-api";
+import { saveBacktestHistory } from "@/lib/backtest-history-api";
 import { useChatContext } from "@/providers/ChatProvider";
 import {
   Card,
@@ -26,7 +32,8 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { PortfolioConfigCard } from "@/pages/portfolio-backtest/PortfolioConfigCard";
+import { PortfolioConfigCard, type PortfolioConfigCardHandle } from "@/pages/portfolio-backtest/PortfolioConfigCard";
+import type { PortfolioFormValues } from "@/pages/portfolio-backtest/portfolio-form-schema";
 import { runPortfolioBacktest } from "@/lib/backtest-api";
 import type {
   RunPortfolioBacktestRequestBody,
@@ -49,34 +56,45 @@ const ASSET_LABELS: Record<string, string> = {
 export default function PortfolioPage() {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<RunPortfolioBacktestResponse | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const portfolioCardRef = useRef<PortfolioConfigCardHandle>(null);
 
 
   const { setLatestBacktest } = useChatContext();
 
   const mutation = useMutation({
     mutationFn: runPortfolioBacktest,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       setResult(data);
       toast.success("Portfolio backtest completed");
-      // ENH-2: make result available to FloatingAiChat globally
       const symbols = data.summary.assets.map((a) => a.symbol).join(" / ");
+      const label = `${symbols} portfolio backtest`;
+      const flatSummary = {
+        totalInvested: data.summary.totalInvested,
+        currentValue: data.summary.currentValue,
+        totalReturnPercentage: data.summary.totalReturnPercentage,
+        totalHoldings: data.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
+        numberOfPurchases: data.summary.numberOfPurchases,
+        realizedProfit: data.summary.realizedProfit,
+        unrealizedValue: data.summary.unrealizedValue,
+      };
       setLatestBacktest({
-        summary: {
-          totalInvested: data.summary.totalInvested,
-          currentValue: data.summary.currentValue,
-          totalReturnPercentage: data.summary.totalReturnPercentage,
-          totalHoldings: data.summary.assets.reduce((s, a) => s + a.totalUnits, 0),
-          numberOfPurchases: data.summary.numberOfPurchases,
-          realizedProfit: data.summary.realizedProfit,
-          unrealizedValue: data.summary.unrealizedValue,
-        },
+        summary: flatSummary,
         trades: data.trades,
         mode: "portfolio",
-        label: `${symbols} portfolio backtest`,
+        label,
+        assets: variables.assets,
       });
+      saveBacktestHistory({
+        mode: "portfolio",
+        label,
+        summary: flatSummary,
+        trades: data.trades,
+        config: { assets: variables.assets },
+      }).catch(() => {});
     },
     onError: (err) => {
       setSubmitError(
@@ -88,6 +106,18 @@ export default function PortfolioPage() {
   function handleSubmit(body: RunPortfolioBacktestRequestBody) {
     setSubmitError(null);
     mutation.mutate(body);
+  }
+
+  function handleSuggestedAction(action: SuggestedAction) {
+    setAiPanelOpen(false);
+    setIsCollapsed(false);
+    // "amount" in SuggestedAction maps to "totalAmount" in portfolio form
+    const field = (action.field === "amount" ? "totalAmount" : action.field) as keyof PortfolioFormValues;
+    portfolioCardRef.current?.applyField(field, action.value as never);
+    toast.success(`Applied: ${action.label}`, {
+      description: "Form updated — review the change and re-run the backtest.",
+      duration: 4000,
+    });
   }
 
   const chartData = result ? timelineToChartData(result.timeline) : [];
@@ -133,15 +163,36 @@ export default function PortfolioPage() {
   }, [result]);
 
   return (
-    <div className="space-y-6">
+    <TooltipProvider>
+    <div
+      className={cn(
+        "space-y-6",
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-background p-6 overflow-auto"
+          : "",
+      )}
+    >
       <PageHeader
         title="Portfolio Backtest"
         description="Build a multi-asset DCA portfolio and simulate its historical performance."
         actions={
-          <AiAdvisorTrigger
-            onClick={() => setAiPanelOpen(true)}
-            hasResult={!!result}
-          />
+          <div className="flex items-center gap-2">
+            <AiAdvisorTrigger
+              onClick={() => setAiPanelOpen(true)}
+              hasResult={!!result}
+            />
+            {isFullscreen ? (
+              <Button variant="outline" size="sm" onClick={() => setIsFullscreen(false)}>
+                <Minimize2 className="mr-2 h-4 w-4" />
+                Exit fullscreen
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)}>
+                <Maximize2 className="mr-2 h-4 w-4" />
+                Fullscreen
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -149,6 +200,7 @@ export default function PortfolioPage() {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* ── Left: Portfolio config with AssetList (L2-FE-1) ── */}
         <PortfolioConfigCard
+          ref={portfolioCardRef}
           onSubmit={handleSubmit}
           isSubmitting={mutation.isPending}
           submitError={submitError}
@@ -247,6 +299,7 @@ export default function PortfolioPage() {
         open={aiPanelOpen}
         onOpenChange={setAiPanelOpen}
         mode="portfolio"
+        onSuggestedAction={handleSuggestedAction}
         summary={
           result
             ? {
@@ -264,5 +317,6 @@ export default function PortfolioPage() {
         trades={result?.trades}
       />
     </div>
+    </TooltipProvider>
   );
 }

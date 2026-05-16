@@ -34,8 +34,8 @@ export interface UseMcpChatReturn {
   clearMessages: () => void;
 }
 
-export function useMcpChat(): UseMcpChatReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useMcpChat(initialMessages: ChatMessage[] = []): UseMcpChatReturn {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
 
   const addTextMessage = useCallback((text: string, sender: 'user' | 'ai') => {
     const newMessage: ChatMessage = {
@@ -132,8 +132,8 @@ export function useMcpChat(): UseMcpChatReturn {
   }, []);
 
   const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
+    setMessages(initialMessages);
+  }, [initialMessages]);
 
   return {
     messages,

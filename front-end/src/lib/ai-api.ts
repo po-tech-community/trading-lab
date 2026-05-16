@@ -41,11 +41,15 @@ export interface AiAnalyzeResponse {
 
 /**
  * UI chip shape — parsed from the plain string labels the backend returns.
+ * `null` means the label is a query/comparison that should be sent to AI chat,
+ * not applied directly to the form.
  */
 export interface SuggestedAction {
     label: string;
-    field: "frequency" | "amount" | "startDate" | "endDate" | "symbol";
-    value: string | number;
+    field: "frequency" | "amount" | "startDate" | "endDate" | "symbol"
+         | "stopLossThreshold" | "stopLossSellPercent" | "stopLossEnabled"
+         | "takeProfitThreshold" | "takeProfitSellPercent" | "takeProfitEnabled";
+    value: string | number | boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,16 +102,43 @@ export function buildBacktestContext(
 }
 
 /**
- * Parse a plain-text action string from the backend into a typed chip.
+ * Parse a plain-text action label into a typed form action.
+ * Returns null for comparison/relative/ambiguous labels — those should be sent
+ * to the AI as a chat message rather than applied to the form.
  */
-export function parseActionLabel(label: string): SuggestedAction {
+export function parseActionLabel(label: string): SuggestedAction | null {
     const lower = label.toLowerCase();
-    if (lower.includes("weekly")) return { label, field: "frequency", value: "weekly" };
-    if (lower.includes("monthly")) return { label, field: "frequency", value: "monthly" };
-    if (lower.includes("daily")) return { label, field: "frequency", value: "daily" };
-    const amountMatch = lower.match(/\$(\d+)/);
+
+    // Comparisons, relative changes, and open-ended queries → chat only
+    if (lower.includes(" vs ") || lower.includes("compare")) return null;
+    if (/\b(lower|reduce|increase|raise|decrease|adjust)\b.*\bby\b/i.test(lower)) return null;
+
+    // Frequency — only when a single value is clearly stated
+    const hasWeekly = lower.includes("weekly");
+    const hasMonthly = lower.includes("monthly");
+    const hasDaily = lower.includes("daily");
+    if (hasWeekly && !hasMonthly && !hasDaily) return { label, field: "frequency", value: "weekly" };
+    if (hasMonthly && !hasWeekly && !hasDaily) return { label, field: "frequency", value: "monthly" };
+    if (hasDaily && !hasWeekly && !hasMonthly) return { label, field: "frequency", value: "daily" };
+
+    // Amount — explicit dollar value
+    const amountMatch = lower.match(/\$(\d+(?:\.\d+)?)/);
     if (amountMatch) return { label, field: "amount", value: Number(amountMatch[1]) };
-    return { label, field: "frequency", value: "weekly" };
+
+    // Symbol
+    if (/\b(btc|bitcoin)\b/.test(lower)) return { label, field: "symbol", value: "BTC" };
+    if (/\b(eth|ethereum)\b/.test(lower)) return { label, field: "symbol", value: "ETH" };
+    if (/\baapl\b/.test(lower)) return { label, field: "symbol", value: "AAPL" };
+    if (/\btsla\b/.test(lower)) return { label, field: "symbol", value: "TSLA" };
+
+    // Stop-loss / take-profit — explicit numeric threshold
+    const slMatch = lower.match(/stop.?loss.*?(\d+(?:\.\d+)?)\s*%/);
+    if (slMatch) return { label, field: "stopLossThreshold", value: Number(slMatch[1]) };
+    const tpMatch = lower.match(/take.?profit.*?(\d+(?:\.\d+)?)\s*%/);
+    if (tpMatch) return { label, field: "takeProfitThreshold", value: Number(tpMatch[1]) };
+
+    // No clear mapping — treat as a chat query
+    return null;
 }
 
 // ── MCP Inspect / Execute types ───────────────────────────────────────────────

@@ -1,21 +1,20 @@
-/**
- * Backtest feature MODULE – price service, calculation engine, backtest API.
- *
- * Level 1: PriceService (fetch historical prices from CoinGecko / AlphaVantage)
- * Level 1: CalculationService (DCA simulation engine) – coming next
- * Level 1: BacktestController (POST /backtest/run) – coming next
- *
- * @see doc/developer-tasks.md L1-BE-1, L1-BE-2, L1-BE-3
- */
-
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { PriceService } from './price.service';
 import { BacktestController } from './backtest.controller';
 import { CalculationService } from './calculation.service';
+import { BacktestHistoryController } from './backtest-history.controller';
+import { BacktestHistoryService } from './backtest-history.service';
+import { BacktestHistory, BacktestHistorySchema } from './schemas/backtest-history.schema';
 
 @Module({
-    controllers: [BacktestController],
-    providers: [PriceService, CalculationService],
-    exports: [PriceService, CalculationService],
+  imports: [
+    MongooseModule.forFeature([
+      { name: BacktestHistory.name, schema: BacktestHistorySchema },
+    ]),
+  ],
+  controllers: [BacktestController, BacktestHistoryController],
+  providers: [PriceService, CalculationService, BacktestHistoryService],
+  exports: [PriceService, CalculationService],
 })
-export class BacktestModule { }
+export class BacktestModule {}

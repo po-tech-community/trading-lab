@@ -7,6 +7,7 @@
  *  - Submit blocked until weights sum to 100%
  */
 
+import { forwardRef, useImperativeHandle } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -65,6 +66,13 @@ import {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+export interface PortfolioConfigCardHandle {
+  applyField: <K extends keyof PortfolioFormValues>(
+    field: K,
+    value: PortfolioFormValues[K],
+  ) => void;
+}
+
 export interface PortfolioConfigCardProps {
   onSubmit: (body: RunPortfolioBacktestRequestBody) => void;
   isSubmitting?: boolean;
@@ -75,13 +83,16 @@ export interface PortfolioConfigCardProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function PortfolioConfigCard({
+export const PortfolioConfigCard = forwardRef<
+  PortfolioConfigCardHandle,
+  PortfolioConfigCardProps
+>(function PortfolioConfigCard({
   onSubmit,
   isSubmitting = false,
   submitError,
   isCollapsed,
   onCollapsedChange,
-}: PortfolioConfigCardProps) {
+}, ref) {
   const todayIso = getTodayUtcIsoDate();
   const oneYearAgoIso = getCryptoMinUtcIsoDate();
   const defaultStart = oneYearAgoIso > "" ? oneYearAgoIso : "2023-01-01";
@@ -107,6 +118,10 @@ export function PortfolioConfigCard({
     },
     mode: "onChange",
   });
+
+  useImperativeHandle(ref, () => ({
+    applyField: (field, value) => form.setValue(field, value, { shouldValidate: true }),
+  }));
 
   // Derive whether weight sum is currently valid (live, from watched values)
   const assets = form.watch("assets");
@@ -435,4 +450,4 @@ export function PortfolioConfigCard({
       <div className="absolute bottom-0 left-0 w-full h-px bg-border" />
     </Card>
   );
-}
+});

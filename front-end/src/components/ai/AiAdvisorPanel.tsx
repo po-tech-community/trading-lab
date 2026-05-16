@@ -198,8 +198,13 @@ export function AiAdvisorPanel({
   // L4-FE-3: parse the plain string label → typed SuggestedAction for the parent
   const handleChipClick = (label: string) => {
     const action = parseActionLabel(label);
-    onSuggestedAction?.(action);
-    sendMessage(`Apply suggestion: ${label}`);
+    if (action && onSuggestedAction) {
+      // Clear mapping to a form field — apply directly, no need to also chat about it
+      onSuggestedAction(action);
+    } else {
+      // Comparison / relative / ambiguous — send as a chat query to the AI
+      void sendMessage(label);
+    }
   };
  
   return (
@@ -361,7 +366,7 @@ export function AiAdvisorPanel({
  
 export function AiAdvisorTrigger({ onClick, hasResult }: { onClick: () => void; hasResult: boolean }) {
   return (
-    <Button variant={hasResult ? "default" : "outline"} size="sm" onClick={onClick} className="gap-2">
+    <Button variant="outline" size="sm" onClick={onClick} className="gap-2">
       <BrainCircuit className="size-4" />
       Consult AI Advisor
       {hasResult && (

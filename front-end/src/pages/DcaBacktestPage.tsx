@@ -27,6 +27,7 @@ import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
 import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
 import type { SuggestedAction } from "@/lib/ai-api";
 import { useChatContext } from "@/providers/ChatProvider";
+import { saveBacktestHistory } from "@/lib/backtest-history-api";
 
 function formatApiError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -75,15 +76,28 @@ export default function DcaBacktestPage() {
 
   const mutation = useMutation({
     mutationFn: runBacktest,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       setBacktestResult(data);
       toast.success("Backtest completed");
+      const label = `${assetLabelMap[selectedSymbol] ?? selectedSymbol} DCA backtest`;
       setLatestBacktest({
         summary: data.summary,
         trades: data.trades,
         mode: "single",
-        label: `${assetLabelMap[selectedSymbol] ?? selectedSymbol} DCA backtest`,
+        label,
+        symbol: selectedSymbol,
       });
+      saveBacktestHistory({
+        mode: "single",
+        label,
+        summary: data.summary,
+        trades: data.trades,
+        config: {
+          symbol: variables.symbol,
+          frequency: variables.frequency,
+          amount: variables.amount,
+        },
+      }).catch(() => {});
     },
     onError: (err) => {
       toast.error(formatApiError(err));
@@ -131,12 +145,12 @@ export default function DcaBacktestPage() {
               />
  
               {isFullscreen ? (
-                <Button variant="outline" onClick={() => setIsFullscreen(false)}>
+                <Button variant="outline" size="sm" onClick={() => setIsFullscreen(false)}>
                   <Minimize2 className="mr-2 h-4 w-4" />
                   Exit fullscreen
                 </Button>
               ) : (
-                <Button variant="outline" onClick={() => setIsFullscreen(true)}>
+                <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)}>
                   <Maximize2 className="mr-2 h-4 w-4" />
                   Fullscreen
                 </Button>
