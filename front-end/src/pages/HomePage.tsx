@@ -36,10 +36,10 @@ const quickActions = [
     title: "AI Advisor",
     description: "Chat and get market insights",
     usage:
-      "Coming soon: chat with the advisor after it is wired to real backtest data.",
+      "Run a backtest first, then open the AI Advisor to get context-aware advice on your strategy, returns, and next steps.",
     href: "/home/ai-advisor",
     icon: Bot,
-    enabled: false,
+    enabled: true,
   },
   {
     title: "Settings",
@@ -156,16 +156,15 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="text-base">AI Advisor</CardTitle>
             <CardDescription>
-              Coming soon: ask short questions about your strategy after the
-              advisor is connected to real backtest data.
+              Ask questions about your strategy after running a backtest — the advisor uses your results to give context-aware advice.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="mb-3 text-xs text-muted-foreground">
-              How to use: not available yet.
+              How to use: run a DCA or portfolio backtest, then open the AI Advisor to chat about your results.
             </p>
-            <Button variant="outline" size="sm" disabled>
-              Open AI Advisor
+            <Button asChild variant="outline" size="sm">
+              <Link to="/home/ai-advisor">Open AI Advisor</Link>
             </Button>
           </CardContent>
         </Card>
