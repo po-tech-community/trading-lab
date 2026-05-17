@@ -47,6 +47,66 @@ An AI chat panel backed by OpenAI that analyzes a backtest result and answers us
 
 ---
 
+## Why We Built This Project
+
+This question will come up in every interview. Here is how to answer it — and the reasoning behind why this project was designed this way.
+
+---
+
+### The problem it solves
+
+Dollar-cost averaging is one of the most widely recommended investment strategies: instead of trying to time the market, you invest a fixed amount on a regular schedule regardless of price. Millions of people do this with Bitcoin, stocks, or ETFs.
+
+The problem is that most retail investors invest blind. They have no way to answer basic questions before committing real money:
+
+- _"Would weekly buys have outperformed monthly buys over the last year?"_
+- _"If I had set a take-profit trigger at 20% gain, what would my realized profit look like?"_
+- _"How did BTC perform in my portfolio compared to AAPL at the same weight?"_
+- _"What does an AI think about my strategy given the actual numbers?"_
+
+TradingLab is a simulation environment that lets you answer those questions risk-free, with real historical price data, before committing a single dollar.
+
+---
+
+### Why these technology choices
+
+Every technology decision in this project maps to something you will see in a real company.
+
+| Choice | Why |
+|--------|-----|
+| **NestJS** | The most widely adopted Node.js framework in enterprise backends. Modular, testable, opinionated — the same patterns you will encounter at your internship |
+| **MongoDB** | Financial time-series data and user records have different shapes. MongoDB's flexible schema lets you model both without forcing a single rigid table structure |
+| **Redis** | AI calls are expensive. Rate limiting, caching, and session management are real operational concerns that every production system handles — Redis is the standard tool |
+| **BigNumber.js** | Financial calculations must be exact. You cannot use floating-point arithmetic when rounding errors compound across hundreds of trades |
+| **OpenAI + MCP** | AI is not magic — it needs structured, current data to give useful answers. MCP (Model Context Protocol) is the emerging standard for how AI agents interact with real systems |
+| **React + TanStack Query** | Separating server state from UI state is one of the most important architectural decisions in a frontend. TanStack Query is the industry standard for this |
+| **TypeScript strict mode** | You learn far more about a language by working with a strict type system than by avoiding it. Every type error you fixed taught you something about how the runtime actually works |
+
+---
+
+### Why it matters for your career
+
+Most internship projects students show in interviews are either:
+- A CRUD app with a database (shows you can follow a tutorial)
+- A clone of an existing product (shows you can copy)
+
+TradingLab is neither. It involves:
+- **A real domain** — financial calculations have correctness requirements that you cannot fake
+- **Real external APIs** — with rate limits, unexpected response formats, and free-tier constraints
+- **A real AI integration** — not just calling OpenAI and displaying the result, but structuring tool evidence and streaming responses
+- **Real security decisions** — dual-token auth, HttpOnly cookies, OAuth validation, rate limiting
+- **Real operational concerns** — audit logs, request timeouts, environment config, zero vulnerabilities
+
+When an interviewer asks _"tell me about a project you built"_, the depth behind each of these decisions is what drives a 20-minute technical conversation. That conversation is what gets you the offer.
+
+**How to answer "why did you build this?" in an interview:**
+
+> _"I built a DCA backtesting platform because most retail investors have no way to test their investment strategy before committing real money. The interesting engineering problems were around financial precision — floating-point arithmetic breaks for money, so I used BigNumber.js — real-time AI output via SSE streaming, and integrating MCP tool servers so the AI advisor could reason over actual market data rather than hallucinating from training knowledge."_
+
+That answer demonstrates domain understanding, specific technical decisions, and the ability to explain trade-offs. That is what separates you from candidates who just list technologies.
+
+---
+
 ## Code Quality — Current State
 
 ### Backend
