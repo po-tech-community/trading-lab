@@ -9,10 +9,10 @@ export interface McpExecution {
   id: string;
   toolName: string;
   purpose: string;
-  inputPreview: Record<string, any>;
+  inputPreview: Record<string, unknown>;
   status: 'pending' | 'approved' | 'denied' | 'executing' | 'completed' | 'failed';
   error?: string;
-  result?: any;
+  result?: Record<string, unknown>;
   timestamp: Date;
 }
 
@@ -78,7 +78,7 @@ export function McpExecutionPanel({
   const config = statusConfig[execution.status];
   const Icon = config.icon;
 
-  const formatInputPreview = (input: Record<string, any>) => {
+  const formatInputPreview = (input: Record<string, unknown>) => {
     return Object.entries(input)
       .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
       .join(', ');

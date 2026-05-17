@@ -3,9 +3,9 @@
  */
 export class ApiError extends Error {
   public status: number;
-  public data: any;
+  public data: Record<string, unknown> | undefined;
 
-  constructor(status: number, message: string, data?: any) {
+  constructor(status: number, message: string, data?: Record<string, unknown>) {
     super(message);
     this.status = status;
     this.data = data;

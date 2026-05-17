@@ -12,7 +12,7 @@
  * @see https://docs.nestjs.com/first-steps
  */
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -78,8 +78,9 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
 
+  const logger = new Logger('Bootstrap');
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api/v1`);
-  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  logger.log(`Application is running on: http://localhost:${port}/api/v1`);
+  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 bootstrap();

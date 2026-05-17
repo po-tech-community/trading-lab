@@ -7,9 +7,9 @@ export function timelineToChartData(
 ): ChartDataPoint[] {
   return timeline.map((p) => ({
     date: new Date(p.date).toISOString().slice(0, 10),
-    invested: (p as any).cumulativeInvested ?? 0,
-    value: (p as any).portfolioValue ?? 0,
+    invested: p.cumulativeInvested,
+    value: p.portfolioValue,
     // Portfolio points don't include a single-asset close price
-    close: (p as any).close ?? 0,
+    close: 'close' in p ? p.close : 0,
   }));
 }
