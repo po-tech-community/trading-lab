@@ -48,8 +48,8 @@ export default function SettingsPage() {
         setProfile(data as MeResponse);
         setFirstName(data.firstName ?? "");
         setLastName(data.lastName ?? "");
-      } catch (err: any) {
-        setError(err.message || "Failed to load profile");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load profile");
       } finally {
         setIsLoading(false);
       }
@@ -86,8 +86,8 @@ export default function SettingsPage() {
       setSuccess("Profile updated successfully.");
 
       await refetch();
-    } catch (err: any) {
-      setError(err.message || "Failed to update profile");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setIsSaving(false);
     }

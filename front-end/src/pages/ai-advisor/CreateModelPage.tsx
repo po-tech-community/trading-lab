@@ -15,7 +15,7 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -112,8 +112,8 @@ export default function CreateModelPage() {
   const navigate = useNavigate();
   const { models, addModel, removeModel } = useAiModels();
 
-  const form = useForm<ModelFormValues>({
-    resolver: zodResolver(modelFormSchema),
+  const form = useForm<ModelFormValues, unknown, ModelFormValues>({
+    resolver: zodResolver(modelFormSchema) as Resolver<ModelFormValues, unknown, ModelFormValues>,
     defaultValues: DEFAULT_VALUES,
   });
 

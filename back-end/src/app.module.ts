@@ -21,7 +21,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { TodosModule } from './todos/todos.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { BacktestModule } from './backtest/backtest.module';
 import { AiModule } from './ai/ai.module';
@@ -56,7 +55,6 @@ import { AiModule } from './ai/ai.module';
       : [CacheModule.register({ isGlobal: true })]),
     AuthModule,
     UsersModule,
-    TodosModule,
     BacktestModule,
     AiModule,
   ],

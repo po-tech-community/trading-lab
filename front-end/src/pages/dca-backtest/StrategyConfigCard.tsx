@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import {
   backtestFormSchema,
   getCryptoMinUtcIsoDate,
@@ -109,9 +109,9 @@ export const StrategyConfigCard = forwardRef<StrategyConfigCardHandle, StrategyC
     },
   }));
 
-  const selectedSymbol = form.watch("symbol");
-  const takeProfitEnabled = form.watch("takeProfitEnabled");
-  const stopLossEnabled = form.watch("stopLossEnabled");
+  const selectedSymbol = useWatch({ control: form.control, name: "symbol" });
+  const takeProfitEnabled = useWatch({ control: form.control, name: "takeProfitEnabled" });
+  const stopLossEnabled = useWatch({ control: form.control, name: "stopLossEnabled" });
 
   useEffect(() => {
     onSymbolChange?.(selectedSymbol);

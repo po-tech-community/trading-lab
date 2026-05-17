@@ -1,3 +1,4 @@
+import '@/lib/env'; // validates required env vars at startup
 import { QueryProvider } from '@/providers/QueryProvider';
 import { ChatProvider } from '@/providers/ChatProvider';
 import { StrictMode } from 'react';

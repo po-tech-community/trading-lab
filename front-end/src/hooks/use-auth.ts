@@ -126,7 +126,8 @@ export function completeSession(data: SessionPayload) {
 export function useLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || "/home";
+  type LocationState = { from?: { pathname?: string } };
+  const from = (location.state as LocationState)?.from?.pathname ?? "/home";
 
   return useMutation<AuthResponse, Error, LoginPayload>({
     mutationFn: async (data: LoginPayload) => {

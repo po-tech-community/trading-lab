@@ -59,7 +59,6 @@ export interface TradeHistoryTableProps {
 export function TradeHistoryTable({
   trades,
   mode = "single",
-  portfolioSymbols: _portfolioSymbols = [],
   pageSize = 10,
 }: TradeHistoryTableProps) {
   const isPortfolio = mode === "portfolio";

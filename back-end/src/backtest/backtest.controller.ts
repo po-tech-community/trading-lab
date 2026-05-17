@@ -5,8 +5,10 @@ import {
   Get,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiBody,
@@ -17,11 +19,12 @@ import { CalculationService } from './calculation.service';
 import { RunDcaBacktestDto } from './dto/run-dca-backtest.dto';
 import { RunPortfolioDcaBacktestDto } from './dto/run-portfolio-backtest.dto';
 import { PriceService } from './price.service';
-import { Public } from '../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('backtest')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('backtest')
-@Public()
 export class BacktestController {
   constructor(
     private readonly priceService: PriceService,

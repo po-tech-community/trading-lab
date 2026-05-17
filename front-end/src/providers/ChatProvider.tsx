@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * ChatProvider  —  ENH-2 + ENH-3
  *
@@ -49,6 +50,10 @@ export interface BacktestSnapshot {
   mode: "single" | "portfolio";
   /** Human-readable label, e.g. "BTC DCA" or "BTC / ETH portfolio" */
   label: string;
+  /** Single-asset mode: the traded symbol (e.g. "BTC") */
+  symbol?: string;
+  /** Portfolio mode: asset weights passed to the backtest */
+  assets?: Array<{ symbol: string; weight: number }>;
 }
 
 // ── Context shape ─────────────────────────────────────────────────────────────

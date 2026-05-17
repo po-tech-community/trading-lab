@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { Sparkles, ChevronLeft } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,9 @@ import {
   evidenceToCards,
   type McpPlannedTool,
 } from "@/lib/ai-api";
-import type { BacktestSummary, BacktestTrade } from "@/lib/backtest-api";
+import { useChatContext } from "@/providers/ChatProvider";
+import { listBacktestHistory, deleteBacktestHistory, type BacktestHistoryEntry } from "@/lib/backtest-history-api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Tracks the in-flight approval session across approve/deny callbacks.
 interface PendingSession {
@@ -27,119 +29,6 @@ interface PendingSession {
     approved: boolean | null;
   }>;
 }
-
-const backtestSessions: Array<{
-  id: string;
-  label: string;
-  summary: BacktestSummary;
-  trades: BacktestTrade[];
-  config: {
-    mode: "single" | "portfolio";
-    symbol?: string;
-    assets?: Array<{ symbol: string; weight: number }>;
-    amount?: number;
-    frequency?: string;
-    startDate?: number;
-    endDate?: number;
-  };
-}> = [
-  {
-    id: "none",
-    label: "No backtest",
-    summary: {
-      totalInvested: 0,
-      currentValue: 0,
-      totalReturnPercentage: 0,
-      totalHoldings: 0,
-      numberOfPurchases: 0,
-      realizedProfit: 0,
-      unrealizedValue: 0,
-    },
-    trades: [],
-    config: { mode: "single" },
-  },
-  {
-    id: "latest-dca",
-    label: "Latest DCA result",
-    summary: {
-      totalInvested: 5400,
-      currentValue: 6150,
-      totalReturnPercentage: 13.9,
-      totalHoldings: 0,
-      numberOfPurchases: 24,
-      realizedProfit: 450,
-      unrealizedValue: 750,
-    },
-    trades: [
-      {
-        date: Date.now() - 1000 * 60 * 60 * 24 * 45,
-        type: "takeProfit",
-        price: 42000,
-        units: 0.05,
-        profit: 150,
-        sellAction: 100,
-      },
-      {
-        date: Date.now() - 1000 * 60 * 60 * 24 * 12,
-        type: "stopLoss",
-        price: 38000,
-        units: 0.02,
-        profit: -60,
-        sellAction: 100,
-      },
-    ],
-    config: {
-      mode: "single",
-      symbol: "BTC",
-      amount: 225,
-      frequency: "weekly",
-      startDate: Date.now() - 1000 * 60 * 60 * 24 * 365,
-      endDate: Date.now(),
-    },
-  },
-  {
-    id: "latest-portfolio",
-    label: "Latest portfolio result",
-    summary: {
-      totalInvested: 12000,
-      currentValue: 13800,
-      totalReturnPercentage: 15,
-      totalHoldings: 0,
-      numberOfPurchases: 24,
-      realizedProfit: 600,
-      unrealizedValue: 1800,
-    },
-    trades: [
-      {
-        date: Date.now() - 1000 * 60 * 60 * 24 * 40,
-        type: "takeProfit",
-        price: 3200,
-        units: 0.3,
-        profit: 120,
-        sellAction: 100,
-      },
-      {
-        date: Date.now() - 1000 * 60 * 60 * 24 * 20,
-        type: "stopLoss",
-        price: 2150,
-        units: 0.2,
-        profit: -80,
-        sellAction: 100,
-      },
-    ],
-    config: {
-      mode: "portfolio",
-      assets: [
-        { symbol: "BTC", weight: 60 },
-        { symbol: "ETH", weight: 40 },
-      ],
-      amount: 500,
-      frequency: "weekly",
-      startDate: Date.now() - 1000 * 60 * 60 * 24 * 365,
-      endDate: Date.now(),
-    },
-  },
-];
 
 /**
  * Build a compact inputPreview for McpExecutionPanel.
@@ -161,8 +50,32 @@ function buildInputPreview(tool: McpPlannedTool): Record<string, unknown> {
 export default function AiChatPage() {
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
-  const [selectedBacktestId, setSelectedBacktestId] = useState("latest-dca")
+  const [selectedBacktestId, setSelectedBacktestId] = useState("none")
+  const { latestBacktest } = useChatContext()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const { data: historyEntries = [] } = useQuery({
+    queryKey: ["backtest-history"],
+    queryFn: listBacktestHistory,
+    staleTime: 30_000,
+  })
+
+  const handleDeleteHistory = useCallback(async (id: string) => {
+    await deleteBacktestHistory(id)
+    void queryClient.invalidateQueries({ queryKey: ["backtest-history"] })
+    if (selectedBacktestId === id) setSelectedBacktestId("none")
+  }, [queryClient, selectedBacktestId])
+
+  const backtestSessions = useMemo(() => {
+    const sessions: Array<{ id: string; label: string; createdAt?: string }> = [
+      { id: "none", label: "No backtest" },
+    ]
+    for (const entry of historyEntries) {
+      sessions.push({ id: entry._id, label: entry.label, createdAt: entry.createdAt })
+    }
+    return sessions
+  }, [historyEntries])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const pendingRef = useRef<PendingSession | null>(null)
@@ -179,16 +92,12 @@ export default function AiChatPage() {
     denyMcpExecution,
     addResultCards,
     clearMessages,
-  } = useMcpChat()
-
-  useEffect(() => {
-    if (messages.length === 0) {
-      addTextMessage(
-        "Welcome to the AI Advisor Studio. Ask me anything about your DCA backtest strategy.",
-        "ai",
-      )
-    }
-  }, [messages.length, addTextMessage])
+  } = useMcpChat([{
+    id: "welcome",
+    text: "Welcome to the AI Advisor Studio. Ask me anything about your DCA backtest strategy.",
+    sender: "ai",
+    timestamp: new Date(),
+  }])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -201,11 +110,27 @@ export default function AiChatPage() {
     return () => { abortStreamRef.current?.() }
   }, [])
 
-  const selectedBacktest = backtestSessions.find((item) => item.id === selectedBacktestId)
-  const selectedBacktestContext =
-    selectedBacktest && selectedBacktest.id !== "none"
-      ? buildBacktestContext(selectedBacktest.summary, selectedBacktest.trades, selectedBacktest.config)
-      : undefined
+  const selectedBacktestContext = useMemo(() => {
+    if (selectedBacktestId === "none") return undefined
+    const historyEntry: BacktestHistoryEntry | undefined = historyEntries.find(
+      (e) => e._id === selectedBacktestId,
+    )
+    if (historyEntry) {
+      return buildBacktestContext(historyEntry.summary, historyEntry.trades, {
+        mode: historyEntry.mode,
+        symbol: historyEntry.config?.symbol,
+        assets: historyEntry.config?.assets,
+      })
+    }
+    if (selectedBacktestId === "latest" && latestBacktest) {
+      return buildBacktestContext(latestBacktest.summary, latestBacktest.trades, {
+        mode: latestBacktest.mode,
+        symbol: latestBacktest.symbol,
+        assets: latestBacktest.assets,
+      })
+    }
+    return undefined
+  }, [selectedBacktestId, historyEntries, latestBacktest])
 
   const buildQueryWithHistory = (query: string) => {
     const history = messages
@@ -420,6 +345,7 @@ export default function AiChatPage() {
             clearMessages()
             inputRef.current?.focus()
           }}
+          onDeleteSession={handleDeleteHistory}
         />
 
         <ChatPanel
