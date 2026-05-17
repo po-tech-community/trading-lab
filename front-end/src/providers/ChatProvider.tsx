@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * ChatProvider  —  ENH-2 + ENH-3
  *

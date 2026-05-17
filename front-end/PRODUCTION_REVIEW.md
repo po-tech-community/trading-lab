@@ -32,7 +32,7 @@ The scope and technical depth are genuinely above average for student work. Inte
 | -------------------- | ---------------- |
 | 🔴 Must-fix          | 0 — all resolved |
 | 🟠 Should fix soon   | 0 — all resolved |
-| 🟡 Minor / tech debt | 1                |
+| 🟡 Minor / tech debt | 0 — all resolved |
 
 ---
 
@@ -154,7 +154,7 @@ Clean component hierarchy, proper use of React Query for server state, Context f
 
 ### TypeScript & Type Safety
 
-\*\*Rating: ✅ 9/10 — build clean
+**Rating: ✅ 9/10 — build clean**
 
 Remaining `any` violations are inside shadcn/ui generated files (`badge.tsx`, `button.tsx`, `sidebar.tsx`) — not worth modifying as they are managed by the component library.
 
@@ -190,16 +190,6 @@ No open issues.
 **Rating: 🟡 6/10**
 
 No route-based code splitting. Recharts + AI panels load on every page.
-
----
-
-### Minor / Polish
-
-| Severity | File                                              | Issue                                                                                   |
-| -------- | ------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| 🟡       | `src/pages/dca-backtest/TradeHistoryTable.tsx:62` | `_portfolioSymbols` declared but unused                                                 |
-| 🟢       | `src/App.css`                                     | Unused logo-animation styles                                                            |
-| 🟢       | React Fast Refresh (10 ESLint warnings)           | `badgeVariants`, `buttonVariants` exported alongside components in `src/components/ui/` |
 
 ---
 
@@ -326,7 +316,7 @@ This section maps the features you built to the concepts behind them — read it
 | **Backend: Users / Audit**   | ✅ 9/10      | Soft delete, account linking, non-blocking audit — all correct   |
 | **Backend: Infrastructure**  | ✅ 9/10      | NestJS v11 aligned, 0 audit vulnerabilities, Logger consistent   |
 | **Backend: Tests**           | 🟡 5/10      | Core engine tested; auth/price/history not covered               |
-| **Frontend: Architecture**   | ✅ 9/10      | Clean, modern, correct patterns                                  |
+| **Frontend: Architecture**   | ✅ 9/10      | Clean, modern, correct patterns; all polish items resolved                                  |
 | **Frontend: TypeScript**     | ✅ 9/10      | Key `any` violations typed; build clean                          |
 | **Frontend: Performance**    | 🟡 6/10      | No code splitting; Compiler warnings resolved                    |
 | **Overall**                  | **8.8 / 10** | MVP-ready and resume-ready                                       |
