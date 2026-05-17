@@ -13,6 +13,8 @@ export class ApiError extends Error {
   }
 }
 
+import { env } from "./env";
+
 /**
  * A reusable API abstraction using the native fetch API.
  * This can easily be swapped with Axios if needed.
@@ -46,10 +48,7 @@ export async function apiClient<T>(
 
   let response: Response;
   try {
-    response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}${endpoint}`,
-      config,
-    );
+    response = await fetch(`${env.apiUrl}${endpoint}`, config);
   } finally {
     clearTimeout(timeoutId);
   }

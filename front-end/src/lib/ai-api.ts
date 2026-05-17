@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { env } from "@/lib/env";
 import type { BacktestSummary, BacktestTrade } from "@/lib/backtest-api";
 
 // ── Request shape — must match backend AnalyzeAiDto exactly ─────────────────
@@ -213,7 +214,7 @@ export function analyzeBacktestStream(
         onError?: (message: string) => void;
     },
 ): () => void {
-    const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+    const BASE_URL = env.apiUrl;
     const token = localStorage.getItem("accessToken");
 
     const payload = encodeURIComponent(JSON.stringify(body));
