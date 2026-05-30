@@ -169,19 +169,21 @@ export class AuthController {
   }
 
   private setRefreshTokenCookie(res: Response, token: string): void {
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('refreshToken', token, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
       maxAge: Number(this.configService.get('REFRESH_TOKEN_MAX_AGE')),
     });
   }
 
   private clearRefreshTokenCookie(res: Response): void {
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
     });
   }
 }
