@@ -12,6 +12,13 @@ import {
     getSortedRowModel,
     useReactTable,
 } from "@tanstack/react-table"
+
+// Row model factories are stable values — defined once outside the component
+// so the React Compiler doesn't see them as new references on every render.
+const coreRowModel = getCoreRowModel();
+const paginationRowModel = getPaginationRowModel();
+const sortedRowModel = getSortedRowModel();
+const filteredRowModel = getFilteredRowModel();
 import { SlidersHorizontal } from "lucide-react"
 import * as React from "react"
 
@@ -61,12 +68,12 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    getCoreRowModel: coreRowModel,
+    getPaginationRowModel: paginationRowModel,
     onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
+    getSortedRowModel: sortedRowModel,
     onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: filteredRowModel,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {

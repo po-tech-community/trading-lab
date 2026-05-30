@@ -12,16 +12,50 @@
  * @see https://docs.nestjs.com/first-steps
  */
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  app.use(cookieParser());
 
+  const normalizeOrigin = (value: string): string => value.replace(/\/$/, '');
+  const configuredOrigin = normalizeOrigin(
+    config.get<string>('FRONTEND_ORIGIN', 'http://localhost:3000'),
+  );
+
+  const port = config.get('PORT', 8000);
+  // Swagger UI sends requests from the same host as the server, so we must allow it explicitly.
+  const swaggerOrigin = `http://localhost:${port}`;
+
+  app.enableCors({
+    origin: (requestOrigin, callback) => {
+      // Allow non-browser requests (no Origin header), then enforce exact normalized origin match.
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      const allowed = [configuredOrigin, swaggerOrigin];
+      if (allowed.includes(normalizeOrigin(requestOrigin))) {
+        callback(null, true);
+        return;
+      }
+
+      callback(
+        new Error(`Origin ${requestOrigin} is not allowed by CORS`),
+        false,
+      );
+    },
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Authorization',
+  });
   app.setGlobalPrefix('api/v1');
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.useGlobalPipes(
@@ -40,16 +74,19 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Trading Lab API')
-    .setDescription('DCA Simulator & AI Advisor – backtest, portfolio, triggers, AI.')
+    .setDescription(
+      'DCA Simulator & AI Advisor – backtest, portfolio, triggers, AI.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = config.get('PORT', 8000);
+
+  const logger = new Logger('Bootstrap');
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api/v1`);
-  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  logger.log(`Application is running on: http://localhost:${port}/api/v1`);
+  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 bootstrap();

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useLogin } from "@/hooks/use-auth"
+import { beginGoogleAuth, useLogin } from "@/hooks/use-auth"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Lock, LogIn, ShieldCheck } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -33,11 +33,19 @@ export default function LoginPage() {
   })
 
   const onSubmit = async (data: LoginValues) => {
-    loginMutation.mutate(data)
+    form.clearErrors("root")
+  
+    loginMutation.mutate(data, {
+      onError: (error: Error) => {
+        form.setError("root", {
+          message: error.message || "Invalid email or password",
+        })
+      },
+    })
   }
 
   const handleGoogleLogin = () => {
-    console.log("Logging in with Google...")
+    beginGoogleAuth()
   }
 
   return (
@@ -110,9 +118,20 @@ export default function LoginPage() {
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full h-11" size="lg" loading={loginMutation.isPending}>
-                        Sign In
+                    <Button
+                      type="submit"
+                      className="w-full h-11"
+                      size="lg"
+                      loading={loginMutation.isPending}
+                      disabled={loginMutation.isPending}
+                    >
+                      Sign In
                     </Button>
+                    {form.formState.errors.root && (
+                      <p className="text-sm text-destructive text-center">
+                        {form.formState.errors.root.message}
+                      </p>
+                    )}
                 </form>
             </Form>
 
@@ -133,6 +152,7 @@ export default function LoginPage() {
                 variant="outline"
                 size="lg"
                 className="w-full h-11 text-sm font-medium"
+                type="button"
                 onClick={handleGoogleLogin}
                 >
                 <img src={googleIcon} alt="" className="size-4 shrink-0" aria-hidden />

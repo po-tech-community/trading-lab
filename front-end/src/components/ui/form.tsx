@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 "use client"
 
 import type { Label as LabelPrimitive } from "radix-ui"

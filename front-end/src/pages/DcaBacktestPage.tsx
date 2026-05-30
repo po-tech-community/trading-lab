@@ -1,100 +1,231 @@
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Minimize2, Maximize2, Zap } from "lucide-react"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { PageHeader } from "@/components/common/PageHeader"
+import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ApiError } from "@/lib/api-client";
+import { runBacktest, type RunBacktestResponse, type RunBacktestRequestBody} from "@/lib/backtest-api";
+import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Minimize2, Maximize2, Zap } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-// DCA Backtest feature components
-import { MOCK_CHART_DATA } from "./dca-backtest/constants"
-import { StrategyConfigCard } from "./dca-backtest/StrategyConfigCard"
-import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards"
-import { StrategyPresetsCard } from "./dca-backtest/StrategyPresetsCard"
-import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart"
+import { StrategyConfigCard, type StrategyConfigCardHandle } from "./dca-backtest/StrategyConfigCard";
+import { SummaryStatsCards } from "./dca-backtest/SummaryStatsCards";
+import { PortfolioTrajectoryChart } from "./dca-backtest/PortfolioTrajectoryChart";
+import { timelineToChartData } from "./dca-backtest/timeline-to-chart";
+import { TradeHistoryTable } from "./dca-backtest/TradeHistoryTable";
+
+// L4-FE-1/2/3 — AI Advisor panel + trigger button
+import { AiAdvisorPanel, AiAdvisorTrigger } from "@/components/ai/AiAdvisorPanel";
+import type { SuggestedAction } from "@/lib/ai-api";
+import { useChatContext } from "@/providers/ChatProvider";
+import { saveBacktestHistory } from "@/lib/backtest-history-api";
+
+function formatApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const m = error.data?.message;
+    if (Array.isArray(m)) return m.join(", ");
+    if (typeof m === "string") return m;
+    return error.message;
+  }
+  return error instanceof Error ? error.message : "Request failed";
+}
 
 /**
  * DCA Backtest page: simulate recurring investments over historical data.
- *
- * Layout:
- * - Page header with title and fullscreen toggle
- * - Left: Strategy config card (asset, amount, frequency, date range)
- * - Right: Summary stats (invested, value, ROI), presets, and trajectory chart
- *
- * State is local for now; replace with API/hooks when backend is ready.
  */
 export default function DcaBacktestPage() {
-  const [asset, setAsset] = useState("BTC")
-  const [amount, setAmount] = useState("100")
-  const [frequency, setFrequency] = useState("weekly")
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const location = useLocation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [backtestResult, setBacktestResult] =
+    useState<RunBacktestResponse | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<
+    "BTC" | "ETH" | "AAPL" | "TSLA"
+  >("BTC");
 
-  const handleCalculate = () => {
-    console.log(`Calculating returns for ${asset} at ${amount}/per ${frequency}`)
-    // TODO: call backtest API or local engine
-  }
+  const [lastConfig, setLastConfig] = useState<RunBacktestRequestBody | undefined>(undefined);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const strategyCardRef = useRef<StrategyConfigCardHandle>(null);
+  useEffect(() => {
+    if (!location.hash) return;
+    const frame = window.requestAnimationFrame(() => {
+      setIsSidebarCollapsed(false);
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash]);
+
+  // ENH-2: publish the completed result to global context so FloatingAiChat can use it
+  const { setLatestBacktest } = useChatContext();
+
+  const assetLabelMap: Record<typeof selectedSymbol, string> = {
+    BTC: "Bitcoin",
+    ETH: "Ethereum",
+    AAPL: "Apple",
+    TSLA: "Tesla",
+  };
+
+  const mutation = useMutation({
+    mutationFn: runBacktest,
+    onSuccess: (data, variables) => {
+      setBacktestResult(data);
+      toast.success("Backtest completed");
+      const label = `${assetLabelMap[selectedSymbol] ?? selectedSymbol} DCA backtest`;
+      setLatestBacktest({
+        summary: data.summary,
+        trades: data.trades,
+        mode: "single",
+        label,
+        symbol: selectedSymbol,
+      });
+      saveBacktestHistory({
+        mode: "single",
+        label,
+        summary: data.summary,
+        trades: data.trades,
+        config: {
+          symbol: variables.symbol,
+          frequency: variables.frequency,
+          amount: variables.amount,
+        },
+      }).catch(() => {});
+    },
+    onError: (err) => {
+      toast.error(formatApiError(err));
+    },
+  });
+
+  const chartData = backtestResult
+    ? timelineToChartData(backtestResult.timeline)
+    : [];
+  const chartDescription = backtestResult
+    ? `Performance over the selected range (${chartData.length} points)`
+    : "Run a backtest to see your equity curve";
+
+  const handleSuggestedAction = (action: SuggestedAction) => {
+    setAiPanelOpen(false);
+    setIsSidebarCollapsed(false);
+    strategyCardRef.current?.applyField(action.field as never, action.value as never);
+    toast.success(`Applied: ${action.label}`, {
+      description: "Form updated — review the change and re-run the backtest.",
+      duration: 4000,
+    });
+  };
 
   return (
     <TooltipProvider>
-      {/* Fullscreen mode: fixed overlay; otherwise normal flow */}
       <div
         className={cn(
           "flex flex-col gap-4 pb-10",
-          isFullscreen ? "fixed inset-0 z-50 bg-background p-6 overflow-auto" : ""
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background p-6 overflow-auto"
+            : "",
         )}
       >
-        {/* Page title, description, and fullscreen entry/exit */}
         <PageHeader
           label="Simulator engine v1.0"
           icon={Zap}
           title="DCA Backtest"
           description="Analyze the historical performance of recurring investments with our high-precision simulation engine."
           actions={
-            isFullscreen ? (
-              <Button variant="outline" onClick={() => setIsFullscreen(false)}>
-                <Minimize2 className="mr-2 h-4 w-4" />
-                Exit fullscreen
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => setIsFullscreen(true)}>
-                <Maximize2 className="mr-2 h-4 w-4" />
-                Fullscreen
-              </Button>
-            )
+            <div className="flex items-center gap-2">
+              {/* L4-FE-1: "Consult AI Advisor" trigger button */}
+              <AiAdvisorTrigger
+                onClick={() => setAiPanelOpen(true)}
+                hasResult={!!backtestResult}
+              />
+ 
+              {isFullscreen ? (
+                <Button variant="outline" size="sm" onClick={() => setIsFullscreen(false)}>
+                  <Minimize2 className="mr-2 h-4 w-4" />
+                  Exit fullscreen
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)}>
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Fullscreen
+                </Button>
+              )}
+            </div>
           }
         />
 
         <div className="flex flex-col lg:flex-row gap-4 items-start">
-          {/* Left: strategy parameters (collapsible on small screens) */}
           <StrategyConfigCard
-            asset={asset}
-            onAssetChange={setAsset}
-            amount={amount}
-            onAmountChange={setAmount}
-            frequency={frequency}
-            onFrequencyChange={setFrequency}
-            onCalculate={handleCalculate}
+            ref={strategyCardRef}
+            onSubmit={(body) => {
+              setLastConfig(body);
+              mutation.mutate(body);
+            }}
+            onSymbolChange={setSelectedSymbol}
+            isSubmitting={mutation.isPending}
+            submitError={
+              mutation.isError ? formatApiError(mutation.error) : null
+            }
             isCollapsed={isSidebarCollapsed}
             onCollapsedChange={setIsSidebarCollapsed}
           />
 
-          {/* Right: results (stats, presets, chart) */}
           <div className="flex-1 flex flex-col gap-4 w-full overflow-hidden">
-            {/* Invested / Value / ROI summary (mock values) */}
-            <SummaryStatsCards />
+            <SummaryStatsCards summary={backtestResult?.summary ?? null} />
 
-            {/* Quick preset buttons (mock: do not update form yet) */}
-            <StrategyPresetsCard />
-
-            {/* Main trajectory chart with fullscreen support */}
-            <PortfolioTrajectoryChart
-              data={MOCK_CHART_DATA}
-              isFullscreen={isFullscreen}
-              onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
-            />
+            {chartData.length > 0 ? (
+              <>
+                <PortfolioTrajectoryChart
+                  data={chartData}
+                  trades={backtestResult?.trades ?? []}
+                  isFullscreen={isFullscreen}
+                  onFullscreenChange={() => setIsFullscreen(!isFullscreen)}
+                  chartDescription={chartDescription}
+                  assetLabel={assetLabelMap[selectedSymbol]}
+                />
+                <TradeHistoryTable trades={backtestResult?.trades ?? []} />
+              </>
+            ) : (
+              <Card
+                className={cn(
+                  "flex-1 bg-card relative overflow-hidden border",
+                  isFullscreen && "min-h-[500px]",
+                )}
+              >
+                <CardHeader className="border-b border-border">
+                  <CardTitle className="text-lg font-semibold">
+                    Portfolio trajectory
+                  </CardTitle>
+                  <CardDescription>{chartDescription}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex h-[420px] items-center justify-center text-muted-foreground text-sm">
+                  Configure your strategy and choose &quot;Calculate
+                  returns&quot; to load historical performance.
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
+      <AiAdvisorPanel
+          open={aiPanelOpen}
+          onOpenChange={setAiPanelOpen}
+          summary={backtestResult?.summary ?? null}
+          trades={backtestResult?.trades}
+          config={lastConfig ? {
+            symbol: lastConfig.symbol,
+            amount: lastConfig.amount,
+            frequency: lastConfig.frequency,
+            startDate: lastConfig.startDate,
+            endDate: lastConfig.endDate,
+          } : undefined}
+          onSuggestedAction={handleSuggestedAction}
+        />
     </TooltipProvider>
-  )
+  );
 }

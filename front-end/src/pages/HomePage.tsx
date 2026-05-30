@@ -1,35 +1,55 @@
-import { Link } from "react-router-dom"
-import { PieChart, LineChart, Bot, Settings2, ArrowRight } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { PageHeader } from "@/components/common/PageHeader"
+import { Link } from "react-router-dom";
+import { PieChart, LineChart, Bot, Settings2, ArrowRight } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/common/PageHeader";
 
 const quickActions = [
   {
-    title: "Portfolio",
-    description: "View holdings and strategy performance",
+    title: "Portfolio Backtest",
+    description: "Simulate multi-asset DCA with custom weights",
+    usage:
+      "Allocate weights across multiple assets (BTC, ETH, stocks), set amount & frequency, and see diversified portfolio performance.",
     href: "/home/portfolio",
     icon: PieChart,
+    enabled: true,
+    type: "Multi-asset",
   },
   {
     title: "DCA Backtest",
-    description: "Simulate recurring investment returns",
+    description: "Simulate single-asset recurring investment",
+    usage:
+      "Pick one asset, set amount & frequency, define date range, and analyze returns from historical DCA purchases.",
     href: "/home/backtest",
     icon: LineChart,
+    enabled: true,
+    type: "Single-asset",
   },
   {
     title: "AI Advisor",
     description: "Chat and get market insights",
+    usage:
+      "Run a backtest first, then open the AI Advisor to get context-aware advice on your strategy, returns, and next steps.",
     href: "/home/ai-advisor",
     icon: Bot,
+    enabled: true,
   },
   {
     title: "Settings",
     description: "Workspace and preferences",
+    usage: "Update your profile and basic account preferences.",
     href: "/home/settings",
     icon: Settings2,
+    enabled: true,
   },
-]
+];
 
 export default function HomePage() {
   return (
@@ -44,32 +64,70 @@ export default function HomePage() {
         <h2 className="text-base font-medium mb-4">Quick actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((item) => {
-            const Icon = item.icon
+            const Icon = item.icon;
             return (
-              <Link key={item.href} to={item.href} className="group">
-                <Card className="h-full transition-all duration-200 hover:bg-accent/50 hover:-translate-y-0.5 hover:shadow-md">
-                  <CardHeader className="pb-2">
+              <Card
+                key={item.title}
+                className={
+                  item.enabled
+                    ? "h-full transition-all duration-200 hover:bg-accent/50 hover:-translate-y-0.5 hover:shadow-md"
+                    : "h-full opacity-60 border-dashed"
+                }
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <CardTitle className="text-base">{item.title}</CardTitle>
-                    <CardDescription className="text-sm">
-                      {item.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                    <div className="flex gap-2 shrink-0">
+                      {item.type && (
+                        <Badge variant="outline" className="text-xs">
+                          {item.type}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant={item.enabled ? "default" : "secondary"}
+                        className="shrink-0"
+                      >
+                        {item.enabled ? "Available" : "Coming soon"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <CardTitle className="text-base">{item.title}</CardTitle>
+                  <CardDescription className="text-sm">
+                    {item.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {item.usage}
+                  </p>
+                  {item.enabled ? (
                     <Button
+                      asChild
                       variant="ghost"
                       size="sm"
                       className="gap-1 -ml-2 transition-transform group-hover:translate-x-1"
                     >
+                      <Link to={item.href}>
+                        Open
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 -ml-2"
+                      disabled
+                    >
                       Open
                       <ArrowRight className="h-4 w-4" />
                     </Button>
-                  </CardContent>
-                </Card>
-              </Link>
-            )
+                  )}
+                </CardContent>
+              </Card>
+            );
           })}
         </div>
       </section>
@@ -80,11 +138,15 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="text-base">DCA Simulator</CardTitle>
             <CardDescription>
-              Backtest dollar-cost averaging over historical data. Pick an asset, amount, and
-              frequency to see how a recurring strategy would have performed.
+              Run a recurring-investment backtest. Pick an asset, amount, and
+              frequency, then compare portfolio value vs invested capital.
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs text-muted-foreground">
+              How to use: open the backtest page, choose a symbol, set the date
+              range, and click calculate.
+            </p>
             <Button asChild variant="outline" size="sm">
               <Link to="/home/backtest">Go to DCA Backtest</Link>
             </Button>
@@ -94,11 +156,13 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="text-base">AI Advisor</CardTitle>
             <CardDescription>
-              Get insights and answers about markets and your strategies. Use the floating
-              chat or open the full AI Advisor workspace from the sidebar.
+              Ask questions about your strategy after running a backtest — the advisor uses your results to give context-aware advice.
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs text-muted-foreground">
+              How to use: run a DCA or portfolio backtest, then open the AI Advisor to chat about your results.
+            </p>
             <Button asChild variant="outline" size="sm">
               <Link to="/home/ai-advisor">Open AI Advisor</Link>
             </Button>
@@ -106,5 +170,5 @@ export default function HomePage() {
         </Card>
       </section>
     </div>
-  )
+  );
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useSignUp } from "@/hooks/use-auth"
+import { beginGoogleAuth, useSignUp } from "@/hooks/use-auth"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Lock, ShieldCheck, UserPlus } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -37,11 +37,19 @@ export default function SignUpPage() {
   })
 
   const onSubmit = async (data: SignUpValues) => {
-    signUpMutation.mutate(data)
+    form.clearErrors("root")
+  
+    signUpMutation.mutate(data, {
+      onError: (error: Error) => {
+        form.setError("root", {
+          message: error.message || "Failed to create account",
+        })
+      },
+    })
   }
 
   const handleGoogleSignUp = () => {
-    console.log("Signing up with Google...")
+    beginGoogleAuth()
   }
 
   return (
@@ -139,9 +147,20 @@ export default function SignUpPage() {
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full h-11" size="lg" loading={signUpMutation.isPending}>
-                        Create Account
+                    <Button
+                      type="submit"
+                      className="w-full h-11"
+                      size="lg"
+                      loading={signUpMutation.isPending}
+                      disabled={signUpMutation.isPending}
+                    >
+                      Create Account
                     </Button>
+                    {form.formState.errors.root && (
+                      <p className="text-sm text-destructive text-center">
+                        {form.formState.errors.root.message}
+                      </p>
+                    )}
                 </form>
             </Form>
 
@@ -162,6 +181,7 @@ export default function SignUpPage() {
                 variant="outline"
                 size="lg"
                 className="w-full h-11 text-sm font-medium"
+                type="button"
                 onClick={handleGoogleSignUp}
                 >
                 <img src={googleIcon} alt="" className="size-4 shrink-0" aria-hidden />

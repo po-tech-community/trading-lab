@@ -9,11 +9,19 @@
  * @see https://docs.nestjs.com/techniques/mongodb
  */
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { UsersService } from './users.service';
+import { User, UserSchema } from './schemas/user.schema.js';
+import { UsersController } from './users.controller';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [],
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [
+    AuditModule,
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+  ],
+  controllers: [UsersController],
+  providers: [UsersService],
+  exports: [UsersService, MongooseModule],
 })
 export class UsersModule {}

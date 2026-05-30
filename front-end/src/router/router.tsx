@@ -1,8 +1,8 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import UITestPage from '@/examples/components/UITestPage';
 import MainLayout from '@/layouts/MainLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import SignUpPage from '@/pages/auth/SignUpPage';
+import GoogleAuthCallbackPage from '@/pages/auth/GoogleAuthCallbackPage';
 import ForbiddenPage from '@/pages/error/ForbiddenPage';
 import NotFoundPage from '@/pages/error/NotFoundPage';
 import HomePage from '@/pages/HomePage';
@@ -12,6 +12,8 @@ import MarketDataPage from '@/pages/MarketDataPage';
 import LandingPage from '@/pages/LandingPage';
 import DcaBacktestPage from '@/pages/DcaBacktestPage';
 import AiChatPage from '@/pages/AiChatPage';
+import CreateModelPage from '@/pages/ai-advisor/CreateModelPage';
+import AiSettingsPage from '@/pages/ai-advisor/AiSettingsPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 /** Breadcrumb label per route — change here to update header breadcrumbs. */
@@ -33,9 +35,9 @@ export const router = createBrowserRouter([
     ...breadcrumb('Sign up'),
   },
   {
-    path: 'ui-test-page',
-    element: <UITestPage />,
-    ...breadcrumb('UI Test'),
+    path: '/auth/google/callback',
+    element: <GoogleAuthCallbackPage />,
+    ...breadcrumb('Google Sign-In'),
   },
   {
     path: '/home',
@@ -76,12 +78,12 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-model',
-            element: <div className="p-8">Create Model Page</div>,
+            element: <CreateModelPage />,
             ...breadcrumb('Create Model'),
           },
           {
             path: 'settings',
-            element: <div className="p-8">AI Settings Page</div>,
+            element: <AiSettingsPage />,
             ...breadcrumb('Settings'),
           },
         ],
