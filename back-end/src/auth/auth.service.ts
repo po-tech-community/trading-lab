@@ -18,6 +18,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { RegisterDto } from './dto/register.dto';
@@ -25,8 +26,7 @@ import { LoginDto } from './dto/login.dto';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit/audit.service';
 
-/** In-memory stub: replace with User model from DB (UsersModule) when implementing L0. */
-export interface StubUser {
+export interface AuthUser {
   id: string;
   email: string;
   firstName: string;
@@ -244,8 +244,7 @@ export class AuthService {
       lastName: dto.lastName,
       email: dto.email,
       passwordHash,
-    };
-    this.users.set(id, user);
+    });
 
     const { accessToken, refreshToken } = this.issueAuthTokens(user);
     const authUser = this.toAuthUser(user);
