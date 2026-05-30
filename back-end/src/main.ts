@@ -66,6 +66,12 @@ async function bootstrap() {
     }),
   );
 
+  // Enable CORS
+  app.enableCors({
+    origin: config.get('FRONTEND_ORIGIN'),
+    credentials: true,
+  });
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Trading Lab API')
     .setDescription(
