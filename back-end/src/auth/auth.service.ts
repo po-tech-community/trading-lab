@@ -67,22 +67,37 @@ export class AuthService {
     });
   }
 
-  private signRefreshToken(payload: { sub: string; email: string }): string {
+  private signRefreshToken(payload: {
+    sub: string;
+    email: string;
+    tokenVersion: number;
+  }): string {
     return this.jwtService.sign(payload, {
-      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
   }
 
-  private issueAuthTokens(user: { id?: string; _id?: unknown; email: string }) {
-    const payload = {
+  private issueAuthTokens(user: {
+    id?: string;
+    _id?: unknown;
+    email: string;
+    tokenVersion?: number;
+  }) {
+    const accessPayload = {
       sub: user.id ?? String(user._id),
       email: user.email,
     };
+    const refreshPayload = {
+      ...accessPayload,
+      // tokenVersion is embedded in the refresh token so we can detect
+      // post-logout token reuse without an extra DB round-trip on every request.
+      tokenVersion: user.tokenVersion ?? 0,
+    };
 
     return {
-      accessToken: this.signAccessToken(payload),
-      refreshToken: this.signRefreshToken(payload),
+      accessToken: this.signAccessToken(accessPayload),
+      refreshToken: this.signRefreshToken(refreshPayload),
     };
   }
 
@@ -278,11 +293,11 @@ export class AuthService {
   async refresh(
     refreshToken: string,
   ): Promise<{ user: AuthUser; accessToken: string; refreshToken: string }> {
-    let payload: { sub: string; email: string };
+    let payload: { sub: string; email: string; tokenVersion?: number };
 
     try {
       payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -290,6 +305,14 @@ export class AuthService {
 
     const user = await this.usersService.findById(payload.sub);
     if (!user) throw new UnauthorizedException('User not found');
+
+    // Reject tokens issued before the last logout.
+    // tokenVersion in the JWT must match the value stored on the user document.
+    // On logout we increment the stored version, so any token signed with the
+    // old version becomes invalid immediately — even if the cookie was copied.
+    if ((payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      throw new UnauthorizedException('Refresh token has been revoked');
+    }
 
     const { accessToken, refreshToken: newRefreshToken } =
       this.issueAuthTokens(user);
@@ -303,6 +326,9 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
+    // Increment tokenVersion so any existing refresh token is immediately
+    // invalidated. The next call to /auth/refresh will fail the version check.
+    await this.usersService.incrementTokenVersion(userId);
     await this.auditService.logAuthEvent('logout', userId);
   }
 

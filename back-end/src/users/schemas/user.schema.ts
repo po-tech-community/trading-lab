@@ -23,6 +23,14 @@ export class User {
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
 
+  /**
+   * Incremented on every logout. The refresh token embeds this version at
+   * sign time; on refresh the version in the token must match this field.
+   * A mismatch means the token was issued before the last logout → rejected.
+   */
+  @Prop({ type: Number, default: 0 })
+  tokenVersion: number;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 

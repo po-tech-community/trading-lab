@@ -197,4 +197,18 @@ export class UsersService {
       .findByIdAndUpdate(id, { deletedAt: new Date() })
       .exec();
   }
+
+  /**
+   * Atomically increments tokenVersion.
+   * Called on logout so any previously issued refresh token is immediately invalidated.
+   * Returns the new version so the caller can embed it in the next token if needed.
+   */
+  async incrementTokenVersion(id: string): Promise<number> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(id, { $inc: { tokenVersion: 1 } }, { new: true })
+      .lean()
+      .exec();
+
+    return updated?.tokenVersion ?? 0;
+  }
 }
