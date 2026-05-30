@@ -5,7 +5,7 @@ WORKDIR /app
 # Build tools needed to compile bcrypt native bindings
 RUN apk add --no-cache python3 make g++
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 COPY . .
@@ -20,7 +20,7 @@ ENV NODE_ENV=production
 # Build tools needed to recompile bcrypt native bindings for this Alpine image
 RUN apk add --no-cache python3 make g++
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
